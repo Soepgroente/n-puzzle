@@ -48,6 +48,8 @@ bool	Board::recursiveSolve(Board& board)
 	std::array<int, 4> order{NONE, NONE, NONE, NONE};
 	
 	calculateMoveOrder(order);
+	(void)board; // To suppress unused variable warning for now
+	return true;
 }
 
 void	Board::solve()

@@ -6,8 +6,10 @@ import json
 import threading
 import time
 from typing import List, Tuple
+import os
+import signal
 
-class NPuzzleGUI:  
+class NPuzzleGUI:   
 	def __init__(self, root):
 		self.root = root
 		self.root.title("N-Puzzle Solver")
@@ -18,8 +20,12 @@ class NPuzzleGUI:
 		self.solution_steps = []  # Store solution from executable
 		self.empty_pos = (0, 0)  # Position of empty tile (row, col)
 		self.is_playing = False  # Flag for animation
-		self.tile_buttons = []  # GUI tile buttons
+		self.tile_labels = []  # GUI tile labels (2D array)
+		self.tile_frames = []  # GUI tile frames (2D array)
 		self.moves_per_second = 2.0  # Animation speed
+		self.solver_process = None  # Track the solver process
+		self.current_tile_size = 0  # Cache current tile size
+		self.current_font_size = 0  # Cache current font size
 		
 		# Colors
 		self.tile_color = "#4CAF50"
@@ -31,10 +37,14 @@ class NPuzzleGUI:
 		self.setup_ui()
 		self.initialize_grid()
 		
-		# Bind resize event
+		# Bind resize event with debouncing
+		self.resize_after_id = None
 		self.root.bind('<Configure>', self.on_window_resize)
 		self.last_width = self.root.winfo_width()
 		self.last_height = self.root.winfo_height()
+		
+		# Clean up on exit
+		self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 		
 	def setup_ui(self):
 		"""Create the user interface"""
@@ -106,6 +116,21 @@ class NPuzzleGUI:
 		)
 		self.play_btn.pack(side=tk.LEFT, padx=5)
 		
+		# Cancel button (for stopping solver)
+		self.cancel_btn = tk.Button(
+			first_row,
+			text="Cancel",
+			command=self.cancel_solve,
+			bg="#F44336",
+			fg="white",
+			padx=15,
+			pady=5,
+			font=("Arial", 10, "bold"),
+			cursor="hand2",
+			state=tk.DISABLED
+		)
+		self.cancel_btn.pack(side=tk.LEFT, padx=5)
+		
 		# Second row - Speed slider
 		second_row = tk.Frame(control_frame)
 		second_row.pack(side=tk.TOP, pady=10)
@@ -175,19 +200,31 @@ class NPuzzleGUI:
 		self.grid_frame.pack()
 		
 	def on_window_resize(self, event):
-		"""Handle window resize events"""
-		# Only redraw if the window size actually changed significantly
-		# and if the event is for the root window
-		if event.widget == self.root:
-			current_width = self.root.winfo_width()
-			current_height = self.root.winfo_height()
+		"""Handle window resize events with debouncing"""
+		# Only process resize events for the root window
+		if event.widget != self.root:
+			return
 			
-			# Check if size changed by more than 10 pixels
-			if (abs(current_width - self.last_width) > 10 or 
-				abs(current_height - self.last_height) > 10):
-				self.last_width = current_width
-				self.last_height = current_height
-				self.draw_grid()
+		current_width = self.root.winfo_width()
+		current_height = self.root.winfo_height()
+		
+		# Check if size changed by more than 10 pixels
+		if (abs(current_width - self.last_width) > 10 or 
+			abs(current_height - self.last_height) > 10):
+			
+			# Cancel previous scheduled resize
+			if self.resize_after_id:
+				self.root.after_cancel(self.resize_after_id)
+			
+			# Schedule resize after 100ms of no resize events (debouncing)
+			self.resize_after_id = self.root.after(100, self.do_resize)
+	
+	def do_resize(self):
+		"""Actually perform the resize operation"""
+		self.last_width = self.root.winfo_width()
+		self.last_height = self.root.winfo_height()
+		self.draw_grid()
+		self.resize_after_id = None
 	
 	def on_speed_changed(self, value):
 		"""Handle speed slider change"""
@@ -216,8 +253,23 @@ class NPuzzleGUI:
 		# Set minimum and maximum tile sizes
 		tile_size = max(20, min(tile_size, 150))
 		
-		# Calculate font size based on tile size
-		font_size = max(8, min(32, tile_size // 3))
+		# Calculate font size based on tile size AND number of digits
+		max_number = self.n * self.n - 1
+		num_digits = len(str(max_number))
+		
+		# Base font size on tile size
+		base_font_size = tile_size // 3
+		
+		# Adjust for number of digits
+		if num_digits == 1:
+			font_size = base_font_size
+		elif num_digits == 2:
+			font_size = int(base_font_size * 0.85)
+		else:  # 3 digits (for N >= 11)
+			font_size = int(base_font_size * 0.65)
+		
+		# Ensure font size is within reasonable bounds
+		font_size = max(6, min(32, font_size))
 		
 		return tile_size, font_size
 		
@@ -226,7 +278,7 @@ class NPuzzleGUI:
 		self.n = self.n_var.get()
 		size = self.n * self.n
 		
-		# Create grid in solved state:  1, 2, 3, ..., n*n-1, 0
+		# Create grid in solved state:   1, 2, 3, ..., n*n-1, 0
 		self.grid = [[0 for _ in range(self.n)] for _ in range(self.n)]
 		num = 1
 		for i in range(self.n):
@@ -241,18 +293,22 @@ class NPuzzleGUI:
 		self.draw_grid()
 		
 	def draw_grid(self):
-		"""Draw the puzzle grid"""
-		# Clear existing buttons
+		"""Draw the puzzle grid (full redraw - used for initial setup and resize)"""
+		# Clear existing tiles
 		for widget in self.grid_frame.winfo_children():
 			widget.destroy()
 		
-		self.tile_buttons = []
+		self.tile_labels = []
+		self.tile_frames = []
 		
 		# Calculate tile size dynamically
 		tile_size, font_size = self.calculate_tile_size()
+		self.current_tile_size = tile_size
+		self.current_font_size = font_size
 		
 		for i in range(self.n):
-			row_buttons = []
+			row_labels = []
+			row_frames = []
 			for j in range(self.n):
 				value = self.grid[i][j]
 				
@@ -265,10 +321,11 @@ class NPuzzleGUI:
 				)
 				tile_frame.grid(row=i, column=j, padx=0, pady=0, sticky="nsew")
 				tile_frame.grid_propagate(False)
+				row_frames.append(tile_frame)
 				
 				if value == 0:
 					# Empty tile
-					btn = tk.Label(
+					lbl = tk.Label(
 						tile_frame,
 						text="",
 						bg=self.empty_color,
@@ -278,7 +335,7 @@ class NPuzzleGUI:
 					)
 				else:
 					# Numbered tile
-					btn = tk.Label(
+					lbl = tk.Label(
 						tile_frame,
 						text=str(value),
 						bg=self.tile_color,
@@ -288,17 +345,39 @@ class NPuzzleGUI:
 						font=("Arial", font_size, "bold")
 					)
 				
-				btn.place(relx=0, rely=0, relwidth=1, relheight=1)
-				row_buttons.append(btn)
+				lbl.place(relx=0, rely=0, relwidth=1, relheight=1)
+				row_labels.append(lbl)
 			
-			self.tile_buttons.append(row_buttons)
+			self.tile_labels.append(row_labels)
+			self.tile_frames.append(row_frames)
+	
+	def update_tile(self, row, col):
+		"""Update a single tile's appearance without recreating it"""
+		value = self.grid[row][col]
+		lbl = self.tile_labels[row][col]
+		
+		if value == 0:
+			# Empty tile - only update if it changed
+			lbl.config(
+				text="",
+				bg=self.empty_color,
+				relief=tk.SUNKEN
+			)
+		else:
+			# Numbered tile - only update if it changed
+			lbl.config(
+				text=str(value),
+				bg=self.tile_color,
+				fg=self.text_color,
+				relief=tk.RAISED
+			)
 	
 	def on_n_changed(self, event):
 		"""Handle N dropdown change"""
 		self.solution_steps = []
 		self.play_btn.config(state=tk.DISABLED)
 		self.initialize_grid()
-		self.update_status("Grid size changed. Click Generate to create a puzzle.")
+		self.update_status("Grid size changed.  Click Generate to create a puzzle.")
 	
 	def generate_puzzle(self):
 		"""Generate a random puzzle configuration"""
@@ -324,7 +403,12 @@ class NPuzzleGUI:
 		
 		self.solution_steps = []
 		self.play_btn.config(state=tk.DISABLED)
-		self.draw_grid()
+		
+		# Update all tiles to show new puzzle
+		for i in range(self.n):
+			for j in range(self.n):
+				self.update_tile(i, j)
+		
 		self.update_status(f"Generated random {self.n}x{self.n} puzzle")
 	
 	def get_grid_as_list(self) -> List[int]:
@@ -338,15 +422,33 @@ class NPuzzleGUI:
 		"""Launch the n-puzzle executable and get solution"""
 		self.update_status("Solving puzzle...")
 		self.solve_btn.config(state=tk.DISABLED)
+		self.cancel_btn.config(state=tk.NORMAL)
 		
 		# Run in a separate thread to avoid blocking UI
 		thread = threading.Thread(target=self.run_solver)
 		thread.daemon = True
 		thread.start()
 	
+	def cancel_solve(self):
+		"""Cancel the currently running solver process"""
+		if self.solver_process and self.solver_process.poll() is None:
+			# Process is still running
+			try:
+				if os.name == 'nt':   # Windows
+					self.solver_process.terminate()
+				else:  # Unix/Linux/Mac
+					self.solver_process.send_signal(signal.SIGTERM)
+				
+				self.update_status("Solver cancelled")
+			except Exception as e:
+				self.update_status(f"Error cancelling:  {e}")
+		
+		self.solve_btn.config(state=tk.NORMAL)
+		self.cancel_btn.config(state=tk.DISABLED)
+	
 	def run_solver(self):
 		"""Run the solver executable in a separate thread"""
-		try: 
+		try:
 			# Prepare input data
 			grid_data = self.get_grid_as_list()
 			input_data = {
@@ -354,48 +456,65 @@ class NPuzzleGUI:
 				"grid": grid_data
 			}
 			
+			# Convert to JSON string
+			input_json = json.dumps(input_data)
+			
 			# Call the executable (adjust path as needed)
 			# The executable should accept JSON input and output JSON with solution
-			process = subprocess.Popen(
+			self.solver_process = subprocess.Popen(
 				["./n-puzzle"],  # Change to your executable name/path
 				stdin=subprocess.PIPE,
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
-				text=True
+				text=True,
+				bufsize=1  # Line buffered
 			)
 			
 			# Send input and get output
-			stdout, stderr = process.communicate(input=json.dumps(input_data))
+			# communicate() blocks until process completes
+			stdout, stderr = self.solver_process.communicate(input=input_json, timeout=300)  # 5 min timeout
 			
-			if process.returncode == 0:
+			if self.solver_process.returncode == 0:
 				# Parse solution (expecting JSON array of moves)
-				# Moves:  1=up, 2=down, 3=left, 4=right
-				result = json.loads(stdout)
-				self.solution_steps = result.get("moves", [])
-				
-				self.root.after(0, self.on_solve_success)
+				# Moves:   1=up, 2=down, 3=left, 4=right
+				try:
+					result = json.loads(stdout)
+					self.solution_steps = result.get("moves", [])
+					self.root.after(0, self.on_solve_success)
+				except json.JSONDecodeError as e:
+					error_msg = f"Invalid JSON response: {e}\nOutput: {stdout[: 200]}"
+					self.root.after(0, lambda msg=error_msg: self.on_solve_error(msg))
 			else:
-				error_msg = stderr if stderr else "Unknown error"
-				self.root.after(0, lambda:  self.on_solve_error(error_msg))
+				error_msg = stderr if stderr else f"Process exited with code {self.solver_process.returncode}"
+				self.root.after(0, lambda msg=error_msg: self.on_solve_error(msg))
 				
+		except subprocess.TimeoutExpired:
+			if self.solver_process:
+				self.solver_process.kill()
+			error_msg = "Solver timed out (exceeded 5 minutes)"
+			self.root.after(0, lambda msg=error_msg: self.on_solve_error(msg))
+			
 		except FileNotFoundError:
-			self.root.after(0, lambda: self.on_solve_error(
-				"Executable 'n-puzzle' not found. Please ensure it's in the current directory."
+			self.root.after(0, lambda:  self.on_solve_error(
+				"Executable 'n-puzzle' not found.  Please ensure it's in the current directory."
 			))
-		except json.JSONDecodeError as e:
-			self.root.after(0, lambda: self.on_solve_error(f"Invalid JSON response: {e}"))
 		except Exception as e:
-			self.root.after(0, lambda: self.on_solve_error(str(e)))
+			error_msg = f"Unexpected error: {str(e)}"
+			self.root.after(0, lambda msg=error_msg: self.on_solve_error(msg))
+		finally:
+			self.solver_process = None
 	
 	def on_solve_success(self):
 		"""Called when solver completes successfully"""
 		self.solve_btn.config(state=tk.NORMAL)
+		self.cancel_btn.config(state=tk.DISABLED)
 		self.play_btn.config(state=tk.NORMAL)
 		self.update_status(f"Solution found! {len(self.solution_steps)} moves")
 	
 	def on_solve_error(self, error_msg):
 		"""Called when solver encounters an error"""
 		self.solve_btn.config(state=tk.NORMAL)
+		self.cancel_btn.config(state=tk.DISABLED)
 		self.update_status("Solve failed")
 		messagebox.showerror("Solver Error", error_msg)
 	
@@ -408,7 +527,7 @@ class NPuzzleGUI:
 		if self.is_playing:
 			return
 		
-		# Reset to generated state - would need to store original state
+		# Store original state to reset later if needed
 		# For now, just disable buttons during playback
 		self.generate_btn.config(state=tk.DISABLED)
 		self.solve_btn.config(state=tk.DISABLED)
@@ -454,12 +573,15 @@ class NPuzzleGUI:
 		
 		# Check bounds
 		if 0 <= new_row < self.n and 0 <= new_col < self.n:
-			# Swap tiles
+			# Swap tiles in the data model
 			self.grid[row][col], self.grid[new_row][new_col] = \
 				self.grid[new_row][new_col], self.grid[row][col]
 			self.empty_pos = (new_row, new_col)
 			
-			self.draw_grid()
+			# Only update the two tiles that changed
+			self.update_tile(row, col)
+			self.update_tile(new_row, new_col)
+			
 			self.update_status(f"Playing solution...Step {step_num}/{len(self.solution_steps)}")
 	
 	def on_animation_complete(self):
@@ -473,6 +595,14 @@ class NPuzzleGUI:
 	def update_status(self, message: str):
 		"""Update the status label"""
 		self.status_label.config(text=message)
+	
+	def on_closing(self):
+		"""Clean up when window is closed"""
+		# Kill solver process if running
+		if self.solver_process and self.solver_process.poll() is None:
+			self.solver_process.kill()
+		
+		self.root.destroy()
 
 def main():
 	root = tk.Tk()

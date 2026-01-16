@@ -39,3 +39,6 @@
 
 # debug information files
 *.dwo
+
+n-puzzle
+test.txt
