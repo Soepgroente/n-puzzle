@@ -31,7 +31,7 @@ class Board
 	int	hole;
 
 	bool	isSolved() const noexcept;
-	void	calculateMoveOrder(int* order) const noexcept;
+	void	calculateMoveOrder(std::array<int, 4>& order) const noexcept;
 };
 
 std::ostream& operator<<(std::ostream& os, const Board& board);

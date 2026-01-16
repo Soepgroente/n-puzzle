@@ -1,13 +1,14 @@
 #include "n-puzzle.hpp"
 #include "Board.hpp"
+#include <array>
 
 enum Direction
 {
 	NONE = 0,
-	UP = -1,
-	DOWN = 1,
-	LEFT = 2,
-	RIGHT = 3
+	UP = 1,
+	DOWN = 2,
+	LEFT = 3,
+	RIGHT = 4
 };
 
 bool	Board::isSolved() const noexcept
@@ -22,7 +23,7 @@ bool	Board::isSolved() const noexcept
 	return tiles.back() == 0;
 }
 
-void	Board::calculateMoveOrder(int* order) const noexcept
+void	Board::calculateMoveOrder(std::array<int, 4>& order) const noexcept
 {
 	if (hole + UP * n >= 0)
 	{
@@ -44,7 +45,7 @@ void	Board::calculateMoveOrder(int* order) const noexcept
 
 bool	Board::recursiveSolve(Board& board)
 {
-	int order[4]{NONE, NONE, NONE, NONE};
+	std::array<int, 4> order{NONE, NONE, NONE, NONE};
 	
 	calculateMoveOrder(order);
 }
