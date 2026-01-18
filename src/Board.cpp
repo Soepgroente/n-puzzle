@@ -5,6 +5,9 @@
 #include <sstream>
 #include <stdexcept>
 
+int Board::n = 0;
+int Board::size = 0;
+
 Board::Board(const Board& other)
 {
 	*this = other;
@@ -29,7 +32,6 @@ Board::Board(const char* filename)
 		throw std::invalid_argument("Could not open file: " + std::string(filename));
 	}
 	std::string line;
-	this->n = 0;
 
 	while (file.eof() == false)
 	{
@@ -46,11 +48,11 @@ Board::Board(const char* filename)
 			tiles.push_back(tile);
 			rowCount++;
 		}
-		if (this->n == 0)
+		if (Board::n == 0)
 		{
-			this->n = rowCount;
+			Board::n = rowCount;
 		}
-		else if (this->n != rowCount)
+		else if (Board::n != rowCount)
 		{
 			throw std::invalid_argument("Inconsistent row lengths in file: " + std::string(filename));
 		}
@@ -78,7 +80,65 @@ Board::Board(const char* filename)
 			hole = i;
 		}
 	}
-	this->size = static_cast<int>(tiles.size());
+	Board::size = static_cast<int>(tiles.size());
+}
+
+void	Board::setSolution()
+{
+	solution.resize(n * n);
+
+	int top = 0, bottom = n - 1;
+	int left = 0, right = n - 1;
+	int num = 1;
+	
+	while (top <= bottom && left <= right)
+	{
+		/*	Right	*/
+		for (int col = left; col <= right; col++)
+		{
+			solution[top * n + col] = num;
+			num++;
+		}
+		top++;
+		
+		/*	Down	*/
+		for (int row = top; row <= bottom; row++)
+		{
+			solution[row * n + right] = num;
+			num++;
+		}
+		right--;
+		
+		/*	Left	*/
+		if (top <= bottom)
+		{
+			for (int col = right; col >= left; --col)
+			{
+				solution[bottom * n + col] = num;
+				num++;
+			}
+			bottom--;
+		}
+		
+		/*	Up	*/
+		if (left <= right)
+		{
+			for (int row = bottom; row >= top; row--)
+			{
+				solution[row * n + left] = num;
+				num++;
+			}
+			left++;
+		}
+	}
+	for (int i = 0; i < n * n; i++)
+	{
+		if (solution[i] == n * n)
+		{
+			solution[i] = 0;
+			break;
+		}
+	}
 }
 
 std::ostream& operator<<(std::ostream& os, const Board& board)

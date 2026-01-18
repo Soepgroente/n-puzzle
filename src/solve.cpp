@@ -11,16 +11,9 @@ enum Direction
 	RIGHT = 4
 };
 
-bool	Board::isSolved() const noexcept
+bool	Board::isSolved(const std::vector<int>& tiles) noexcept
 {
-	for (int i = 0; i < size - 1; i++)
-	{
-		if (tiles[i] != i + 1)
-		{
-			return false;
-		}
-	}
-	return tiles.back() == 0;
+	return tiles == Board::solution;
 }
 
 void	Board::calculateMoveOrder(std::array<int, 4>& order) const noexcept
@@ -52,17 +45,10 @@ bool	Board::recursiveSolve(Board& board)
 	return true;
 }
 
-void	Board::solve()
+void	solve(const Board& initialBoard)
 {
-	Board copy = *this;
+	std::vector<Board>	boards;
 
-	path.reserve(1024);
-	bool result = recursiveSolve(copy);
-
-	if (result == false)
-	{
-		std::cout << "No solution found." << std::endl;
-		return;
-	}
-	std::cout << copy << std::endl;
+	boards.reserve(initialBoard.getSize() * 10);
+	boards.push_back(initialBoard);
 }

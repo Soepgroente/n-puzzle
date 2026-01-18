@@ -17,21 +17,21 @@ class Board
 	int	operator[](int index) const { return tiles[index]; }
 
 	const std::vector<int>& getTiles() const { return tiles; }
-	int getSize() const { return n; }
+	int getN() const { return n; }
+	int getSize() const { return size; }
 
-	void	solve();
-	bool	recursiveSolve(Board& board);
-	
+	static bool	isSolved(const std::vector<int>& tiles) noexcept;
+	void		setSolution() noexcept;
+
 	private:
 	
+	static std::vector<int>	solution;
 	std::vector<int>	tiles;
-	std::vector<int>	path;
 	
-	int	n;
-	int	size;
-	int	hole;
+	static int	n;
+	static int	size;
+	int			hole;
 
-	bool	isSolved() const noexcept;
 	void	calculateMoveOrder(std::array<int, 4>& order) const noexcept;
 };
 

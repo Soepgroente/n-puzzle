@@ -1,41 +1,58 @@
-EXEC		:= n-puzzle
-CC			:= c++
-INCLUDES	:= -I./include
-BASEFLAGS	:= -Wall -Wextra -Werror -std=c++20
-DEBUGFLAGS	:= -g -fsanitize=address
-OPTIMFLAGS	:= -O3 -flto -march=native -funroll-loops -DNDEBUG -fno-math-errno
+NAME			:=	n-puzzle
+GUI				=	n_puzzle_gui_mac.py
+CC				:=	c++
+BASE_CPPFLAGS	:=	-Wall -Wextra -Werror -std=c++20 -fPIC
+RELEASE_FLAGS	:=	-DNDEBUG -flto -O3 -march=native -fno-math-errno
+DEBUG_FLAGS		:=	-g -fsanitize=address
 
-SRCS	:=	main.cpp \
-			Board.cpp \
-			BoardSolve.cpp \
+INCLUDES	:=	-I./include \
+				-I/opt/homebrew/include \
 
-SRC_DIR		:= src
-OBJ_DIR		:= $(SRC_DIR)/obj
+SRCS		:=	main.cpp \
+				Board.cpp \
+				solve.cpp \
 
-OBJS		:=	$(addprefix $(OBJ_DIR)/,$(notdir $(SRCS:%.cpp=%.o)))
+SRCDIR		:=	src
+OBJDIR		:=	$(SRCDIR)/obj
+OBJS		:=	$(addprefix $(OBJDIR)/,$(notdir $(SRCS:%.cpp=%.o)))
+SYSTEM		:=	$(shell uname -s)
 
-CPPFLAGS	= $(BASEFLAGS) $(OPTIMFLAGS)
+ifeq ($(SYSTEM), Linux)
+	GUI = n_puzzle_gui_linux.py
+endif
 
-all: $(EXEC)
+CPPFLAGS = $(BASE_CPPFLAGS) $(RELEASE_FLAGS)
 
-debug: CPPFLAGS = $(BASEFLAGS) $(DEBUGFLAGS)
-debug: re
+all: $(NAME)
 
-$(OBJ_DIR):
-	mkdir -p $(OBJ_DIR)
+debug: CPPFLAGS = $(BASE_CPPFLAGS) $(DEBUG_FLAGS)
+debug: $(NAME)
 
-$(EXEC): $(OBJ_DIR) $(OBJS)
-	$(CC) $(CPPFLAGS) $(INCLUDES) $(OBJS) -o $(EXEC)
+run: all
+	python3 $(GUI)
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+rundebug: debug
+	python3 $(GUI)
+
+rerundebug: fclean rundebug
+
+rerun: fclean run
+
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+$(NAME): $(OBJDIR) $(OBJS)
+	$(CC) $(CPPFLAGS) $(INCLUDES) -o $(NAME) $(OBJS)
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 	$(CC) $(CPPFLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
-	rm -rf $(OBJ_DIR)
+	rm -rf $(OBJDIR)
 
 fclean: clean
-	rm -f $(EXEC)
+	rm -f $(NAME)
 
 re: fclean all
 
-.PHONY: all clean fclean re debug
+.PHONY: all debug clean fclean re run rundebug rerun
