@@ -8,9 +8,11 @@ DEBUG_FLAGS		:=	-g -fsanitize=address
 INCLUDES	:=	-I./include \
 				-I/opt/homebrew/include \
 
-SRCS		:=	main.cpp \
-				Board.cpp \
-				solve.cpp \
+SRCS		:=	Board.cpp \
+				heuristics.cpp \
+				main.cpp \
+				PuzzleData.cpp \
+				PuzzleSolve.cpp \
 
 SRCDIR		:=	src
 OBJDIR		:=	$(SRCDIR)/obj

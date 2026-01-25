@@ -1,0 +1,2 @@
+manhattan distance
+1 2 7 0 8 6 3 5 4

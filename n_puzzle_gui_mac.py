@@ -1,109 +1,86 @@
 #!/usr/bin/env python3
-"""
-N-Puzzle GUI for macOS using Qt
-Displays an interactive N×N sliding puzzle grid with controls to generate,
-solve, and animate solutions.   
-"""
-
+import os
 import sys
 import random
 import subprocess
 import json
-from typing import List, Tuple, Optional
+from typing import List, Tuple
+from pathlib import Path
 
 from PyQt6.QtWidgets import (
 	QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 	QPushButton, QComboBox, QLabel, QMessageBox, QGraphicsView,
 	QGraphicsScene, QGraphicsRectItem, QGraphicsTextItem, QSlider, QFrame
 )
-from PyQt6.QtCore import Qt, QTimer, QRectF, pyqtSignal
-from PyQt6.QtGui import QColor, QBrush, QPen, QFont, QPainter, QResizeEvent
-
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QColor, QBrush, QPen, QFont, QPainter
 
 class PuzzleScene(QGraphicsScene):
-	"""Custom graphics scene for the puzzle grid."""
-	
 	def __init__(self, parent=None):
 		super().__init__(parent)
-		# Wood color for background
-		self.setBackgroundBrush(QBrush(QColor(160, 82, 45)))  # Sienna brown
-
+		self.setBackgroundBrush(QBrush(QColor(160, 82, 45)))
 
 class WoodFrame(QFrame):
 	"""Custom frame widget with wood-like appearance."""
-	
 	def __init__(self, parent=None):
 		super().__init__(parent)
-		self.setStyleSheet("""
-			QFrame {
-				background:  qlineargradient(x1: 0, y1:0, x2:1, y2:1,
-					stop: 0 #8B4513, stop:0.5 #A0522D, stop:1 #8B4513);
-				border:  3px solid #654321;
-				border-radius:  8px;
-				padding: 15px;
-			}
-		""")
+		self.setStyleSheet("""QFrame {
+			background:  qlineargradient(x1: 0, y1:0, x2:1, y2:1,
+			stop: 0 #8B4513, stop:0.5 #A0522D, stop:1 #8B4513);
+			border:  3px solid #654321;
+			border-radius:  8px;
+			padding: 15px; }""")
 		self.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Raised)
 		self.setLineWidth(3)
 
-
 class NPuzzleGUI(QMainWindow):
-	"""Main application window for the N-Puzzle solver."""
-	
-	# Colors
-	TILE_COLOR = QColor(34, 139, 34)  # Forest green
-	WOOD_COLOR = QColor(160, 82, 45)  # Sienna brown (same as board)
+	TILE_COLOR = QColor(34, 139, 34)
+	WOOD_COLOR = QColor(160, 82, 45)
 	TILE_TEXT_COLOR = QColor(255, 255, 255)
-	BG_COLOR = QColor(50, 50, 60)  # Dark blue-gray
+	BG_COLOR = QColor(50, 50, 60)
 	
 	def __init__(self):
 		super().__init__()
-		
-		# State variables
-		self.n = 3  # Grid size
-		self.grid: List[int] = []  # Current puzzle state
-		self.solution_moves: List[int] = []  # Stored solution
+
+		self.n = 3
+		self.grid: List[int] = []
+		self.solution_moves: List[int] = []
 		self.animation_running = False
 		self.empty_pos:  Tuple[int, int] = (0, 0)
 		
-		# Graphics items cache
 		self.tile_rects = {}
 		self.tile_texts = {}
 		self.tile_size = 80
 		
-		# Animation timer and speed (default:  2 moves per second = 500ms)
 		self.animation_timer = QTimer()
 		self.animation_timer.timeout.connect(self._animation_tick)
 		self.current_move_index = 0
-		self.animation_speed_ms = 500  # milliseconds between moves
+		self.animation_speed_ms = 500
+		self.selected_heuristic = "none"
+		self.selected_puzzle_file = None
 
 		self.resize_timer = QTimer()
-		self.resize_timer. setSingleShot(True)
-		self.resize_timer.timeout. connect(self._handle_resize)
+		self.resize_timer.setSingleShot(True)
+		self.resize_timer.timeout.connect(self._handle_resize)
 		
 		self._setup_ui()
 		self._generate_puzzle()
 		
 	def _setup_ui(self):
-		"""Set up the user interface."""
 		self.setWindowTitle("N-Puzzle Solver")
 		self.setStyleSheet(f"QMainWindow {{ background-color: {self.BG_COLOR.name()}; }}")
-		
-		# Central widget
+
 		central_widget = QWidget()
 		central_widget.setStyleSheet(f"background-color: {self.BG_COLOR.name()};")
 		self.setCentralWidget(central_widget)
 		
-		# Main layout
 		main_layout = QVBoxLayout(central_widget)
 		main_layout.setContentsMargins(15, 15, 15, 15)
 		main_layout.setSpacing(15)
 		
-		# Control panel
 		control_layout = QHBoxLayout()
 		control_layout.setSpacing(10)
 		
-		# N selector
 		n_label = QLabel("Grid Size (N):")
 		n_label.setStyleSheet("font-size: 12pt; color: white; background:  transparent;")
 		control_layout.addWidget(n_label)
@@ -135,10 +112,10 @@ class NPuzzleGUI(QMainWindow):
 		
 		control_layout.addSpacing(10)
 		
-		# Generate button
 		self.gen_button = QPushButton("Generate")
-		self.gen_button.setStyleSheet("""
-			QPushButton {
+		self.gen_button.setStyleSheet(
+			"""QPushButton
+			{
 				background-color: #5cb85c;
 				color:  white;
 				font-size:  12pt;
@@ -147,24 +124,16 @@ class NPuzzleGUI(QMainWindow):
 				border:  none;
 				border-radius: 4px;
 			}
-			QPushButton:hover {
-				background-color: #4cae4c;
-			}
-			QPushButton:pressed {
-				background-color: #449d44;
-			}
-			QPushButton:disabled {
-				background-color: #555;
-				color: #aaa;
-			}
-		""")
+			QPushButton:hover { background-color: #4cae4c; }
+			QPushButton:pressed { background-color: #449d44; }
+			QPushButton:disabled { background-color: #555; color: #aaa; }""")
 		self.gen_button.clicked.connect(self._generate_puzzle)
 		control_layout.addWidget(self.gen_button)
 		
-		# Solve button
 		self.solve_button = QPushButton("Solve")
-		self.solve_button.setStyleSheet("""
-			QPushButton {
+		self.solve_button.setStyleSheet(
+			"""QPushButton
+			{
 				background-color: #5bc0de;
 				color: white;
 				font-size: 12pt;
@@ -173,24 +142,17 @@ class NPuzzleGUI(QMainWindow):
 				border: none;
 				border-radius: 4px;
 			}
-			QPushButton:hover {
-				background-color: #46b8da;
-			}
-			QPushButton:pressed {
-				background-color: #31b0d5;
-			}
-			QPushButton:disabled {
-				background-color: #555;
-				color: #aaa;
-			}
-		""")
+			QPushButton:hover {	background-color: #46b8da; }
+			QPushButton:pressed { background-color: #31b0d5; }
+			QPushButton:disabled { background-color: #555; color: #aaa; }""")
+
 		self.solve_button.clicked.connect(self._solve_puzzle)
 		control_layout.addWidget(self.solve_button)
 		
-		# Play solution button
 		self.play_button = QPushButton("Play Solution")
-		self.play_button.setStyleSheet("""
-			QPushButton {
+		self.play_button.setStyleSheet(
+			"""QPushButton
+			{
 				background-color: #f0ad4e;
 				color: white;
 				font-size: 12pt;
@@ -199,29 +161,17 @@ class NPuzzleGUI(QMainWindow):
 				border: none;
 				border-radius: 4px;
 			}
-			QPushButton:hover {
-				background-color: #ec971f;
-			}
-			QPushButton:pressed {
-				background-color: #d58512;
-			}
-			QPushButton:disabled {
-				background-color: #555;
-				color: #aaa;
-			}
-		""")
+			QPushButton:hover { background-color: #ec971f; }
+			QPushButton:pressed { background-color: #d58512; }
+			QPushButton:disabled { background-color: #555; color: #aaa; }""")
 		self.play_button.clicked.connect(self._play_solution)
 		self.play_button.setEnabled(False)
 		control_layout.addWidget(self.play_button)
-		
 		control_layout.addStretch()
-		
 		main_layout.addLayout(control_layout)
-		
-		# Speed control
+
 		speed_layout = QHBoxLayout()
 		speed_layout.setSpacing(10)
-		
 		speed_label = QLabel("Animation Speed:")
 		speed_label.setStyleSheet("font-size: 11pt; color: white; background: transparent;")
 		speed_layout.addWidget(speed_label)
@@ -231,30 +181,29 @@ class NPuzzleGUI(QMainWindow):
 		speed_layout.addWidget(slow_label)
 		
 		self.speed_slider = QSlider(Qt.Orientation.Horizontal)
-		self.speed_slider.setMinimum(1)  # 0.5 moves/sec (2000ms)
-		self.speed_slider.setMaximum(20)  # 10 moves/sec (100ms)
+		self.speed_slider.setMinimum(1)
+		self.speed_slider.setMaximum(20)
 		self.speed_slider.setValue(4)  # 2 moves/sec (500ms) - default
 		self.speed_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
 		self.speed_slider.setTickInterval(2)
-		self.speed_slider.setStyleSheet("""
-			QSlider::groove:horizontal {
+		self.speed_slider.setStyleSheet(
+			"""QSlider::groove:horizontal
+			{
 				border: 1px solid #999;
 				height: 8px;
 				background: #666;
 				margin: 2px 0;
 				border-radius: 4px;
 			}
-			QSlider::handle:horizontal {
+			QSlider::handle:horizontal
+			{
 				background: #5cb85c;
 				border: 2px solid #4cae4c;
 				width: 18px;
 				margin: -5px 0;
 				border-radius: 9px;
 			}
-			QSlider::handle:horizontal:hover {
-				background: #4cae4c;
-			}
-		""")
+			QSlider::handle:horizontal:hover { background: #4cae4c; }""")
 		self.speed_slider.valueChanged.connect(self._on_speed_changed)
 		speed_layout.addWidget(self.speed_slider, 1)
 		
@@ -265,112 +214,167 @@ class NPuzzleGUI(QMainWindow):
 		self.speed_value_label = QLabel("2.0 moves/sec")
 		self.speed_value_label.setStyleSheet("font-size: 10pt; color: white; background: transparent; min-width: 110px;")
 		speed_layout.addWidget(self.speed_value_label)
-		
 		speed_layout.addStretch()
-		
 		main_layout.addLayout(speed_layout)
-		
-		# Wood frame container for puzzle
+
+		heuristic_layout = QHBoxLayout()
+		heuristic_layout.setSpacing(10)
+
+		heuristic_label = QLabel("Heuristic:")
+		heuristic_label.setStyleSheet("font-size: 11pt; color: white; background:  transparent;")
+		heuristic_layout.addWidget(heuristic_label)
+
+		self.heuristic_combo = QComboBox()
+		self.heuristic_combo.addItems(["none", "manhattan distance", "linear conflict", "hamming distance", "euclidean distance", "manhattan + LC"])
+		self.heuristic_combo.setCurrentText("manhattan")
+		self.heuristic_combo.setStyleSheet("""
+			QComboBox {
+				font-size: 11pt;
+				padding: 5px;
+				min-width: 120px;
+				background-color: white;
+				color: black;
+				border: 2px solid #555;
+				border-radius: 4px;
+			}
+			QComboBox::drop-down { border:  none; }
+			QComboBox QAbstractItemView {
+				background-color: white;
+				color: black;
+				selection-background-color: #5cb85c;
+			}
+		""")
+		self.heuristic_combo.currentTextChanged.connect(self._on_heuristic_changed)
+		heuristic_layout.addWidget(self.heuristic_combo)
+
+		heuristic_layout.addSpacing(20)
+
+		# Puzzle file selector
+		puzzle_label = QLabel("Puzzle File:")
+		puzzle_label.setStyleSheet("font-size: 11pt; color: white; background:  transparent;")
+		heuristic_layout.addWidget(puzzle_label)
+
+		self.puzzle_combo = QComboBox()
+		puzzle_files = self._load_puzzle_files()
+		if puzzle_files:
+			self.puzzle_combo.addItem("(Random)", None)
+			for pf in puzzle_files:
+				self.puzzle_combo.addItem(pf, pf)
+		else:
+			self.puzzle_combo.addItem("(Random)", None)
+		self.puzzle_combo.setStyleSheet("""
+			QComboBox {
+				font-size:  11pt;
+				padding:  5px;
+				min-width: 150px;
+				background-color:  white;
+				color: black;
+				border: 2px solid #555;
+				border-radius: 4px;
+			}
+			QComboBox::drop-down { border: none; }
+			QComboBox QAbstractItemView {
+				background-color: white;
+				color:  black;
+				selection-background-color: #5cb85c;
+			}
+		""")
+		self.puzzle_combo.currentIndexChanged.connect(self._on_puzzle_file_changed)
+		heuristic_layout.addWidget(self.puzzle_combo)
+
+		heuristic_layout.addStretch()
+		main_layout.addLayout(heuristic_layout)
+
+		# Stats display
+		stats_layout = QHBoxLayout()
+		stats_layout.setSpacing(15)
+
+		self.stats_label = QLabel("Stats:  No solution yet")
+		self.stats_label.setStyleSheet("font-size:  10pt; color: #aaa; background: transparent;")
+		stats_layout.addWidget(self.stats_label)
+		stats_layout.addStretch()
+		main_layout.addLayout(stats_layout)
+
 		self.wood_frame = WoodFrame()
 		frame_layout = QVBoxLayout(self.wood_frame)
 		frame_layout.setContentsMargins(0, 0, 0, 0)
-		
-		# Graphics view for puzzle
+
 		self.scene = PuzzleScene()
 		self.view = QGraphicsView(self.scene)
 		self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
 		self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 		self.view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-		self.view.setStyleSheet("""
-			QGraphicsView {
-				border: none;
-				background-color: #A0522D;
-			}
-		""")
-		# Disable frame around view
+		self.view.setStyleSheet("""QGraphicsView { border: none; background-color: #A0522D;	}""")
 		self.view.setFrameStyle(QFrame.Shape.NoFrame)
-		
 		frame_layout.addWidget(self.view)
-		
 		main_layout.addWidget(self.wood_frame, 1, Qt.AlignmentFlag.AlignCenter)
-		
 		self._update_view_size()
-		
+
+	def _load_puzzle_files(self):
+		puzzle_dir = Path("puzzles")
+		if not puzzle_dir.exists():
+			return []
+		puzzle_files = sorted([f.name for f in puzzle_dir.iterdir() if f.is_file()])
+		return puzzle_files
+
 	def resizeEvent(self, a0):
-		"""Handle window resize events."""
 		super().resizeEvent(a0)
-		# Debounce resize events - only update after 100ms of no resizing
 		self.resize_timer.start(100)
 		
 	def _handle_resize(self):
-		"""Actually handle the resize after debouncing."""
 		self._update_view_size()
 
 	def _on_speed_changed(self, value:  int):
-		"""Handle speed slider change."""
-		# Map slider value (1-20) to moves per second (0.5-10)
 		moves_per_second = value / 2.0
 		self.animation_speed_ms = int(1000 / moves_per_second)
 		self.speed_value_label.setText(f"{moves_per_second:.1f} moves/sec")
+
+	def _on_heuristic_changed(self, value:  str):
+		self.selected_heuristic = value
+
+	def _on_puzzle_file_changed(self, index: int):
+		self.selected_puzzle_file = self.puzzle_combo.itemData(index)
 		
 	def _update_view_size(self):
-		"""Update the view size based on grid size."""
-		# Dynamically adjust tile size
 		max_canvas_size = 1080
 		self.tile_size = min(80, max_canvas_size // self.n)
-		
 		canvas_size = self.n * self.tile_size
-		
+
 		self.scene.setSceneRect(0, 0, canvas_size, canvas_size)
 		self.view.setMinimumSize(canvas_size + 20, canvas_size + 20)
 		self.view.setMaximumSize(max_canvas_size + 20, max_canvas_size + 20)
-		
-		# Adjust window size
 		self.adjustSize()
 		
 	def _on_n_changed(self, value: str):
-		"""Handle N value change."""
 		self.n = int(value)
 		self.solution_moves.clear()
 		self.play_button.setEnabled(False)
 		
-		# Clear the scene
 		self.scene.clear()
 		self.tile_rects.clear()
 		self.tile_texts.clear()
-		
 		self._update_view_size()
 		self._generate_puzzle()
 		
 	def _generate_puzzle(self):
-		"""Generate a random puzzle configuration."""
-		# Create list [0, 1, 2, ..., n*n-1] and shuffle
 		self.grid = list(range(self.n * self.n))
 		random.shuffle(self.grid)
 		
-		# Find empty tile position
 		self._update_empty_pos()
-		
-		# Clear any previous solution
 		self.solution_moves.clear()
 		self.play_button.setEnabled(False)
-		
 		self._draw_grid()
 		
 	def _update_empty_pos(self):
-		"""Update the position of the empty tile (0)."""
 		idx = self.grid.index(0)
 		self.empty_pos = (idx // self.n, idx % self.n)
 
 	def _draw_grid(self):
-		"""Draw the puzzle grid."""
-		# Clear existing items
 		for item in list(self.tile_rects.values()) + list(self.tile_texts.values()):
 			self.scene.removeItem(item)
 		self.tile_rects.clear()
-		self.tile_texts. clear()
+		self.tile_texts.clear()
 		
-		# Adjust font size for larger grids
 		font_size = max(10, min(28, self.tile_size // 2))
 		font = QFont("Helvetica", font_size, QFont.Weight.Bold)
 		
@@ -384,17 +388,14 @@ class NPuzzleGUI(QMainWindow):
 				
 				tile_id = (i, j)
 				
-				# Determine tile color (wood color for empty, green for tiles)
-				color = self.WOOD_COLOR if value == 0 else self. TILE_COLOR
+				color = self.WOOD_COLOR if value == 0 else self.TILE_COLOR
 				
-				# Create rectangle
 				rect_item = QGraphicsRectItem(x, y, self.tile_size, self.tile_size)
 				rect_item.setBrush(QBrush(color))
-				rect_item. setPen(QPen(QColor(30, 30, 30), 2))
+				rect_item.setPen(QPen(QColor(30, 30, 30), 2))
 				self.scene.addItem(rect_item)
 				self.tile_rects[tile_id] = rect_item
 				
-				# Create text
 				text = "" if value == 0 else str(value)
 				text_item = QGraphicsTextItem(text)
 				text_item.setFont(font)
@@ -402,108 +403,105 @@ class NPuzzleGUI(QMainWindow):
 				self.scene.addItem(text_item)
 				self.tile_texts[tile_id] = text_item
 				
-				# Hide text for empty tiles
 				if value == 0:
 					text_item.setVisible(False)
 				else:
-					# Center the text
 					text_rect = text_item.boundingRect()
 					text_x = x + (self.tile_size - text_rect.width()) / 2
 					text_y = y + (self.tile_size - text_rect.height()) / 2
 					text_item.setPos(text_x, text_y)
 
 	def _solve_puzzle(self):
-		"""Call the n-puzzle executable and receive solution."""
-		# Prepare input for the executable
-		grid_str = ' '.join(map(str, self.grid))
+		cmd = ['./n-puzzle']
+		
+		if self.selected_puzzle_file:
+			cmd.append(f"puzzles/{self.selected_puzzle_file}")
+			input_data = self.selected_heuristic
+		else:
+			input_data = f"{self.selected_heuristic}\n{' '.join(map(str, self.grid))}"
 		
 		try:
-			# Launch the executable
 			result = subprocess.run(
-				['./n-puzzle'],
-				input=grid_str,
+				cmd,
+				input=input_data,
 				capture_output=True,
 				text=True,
-				timeout=30
+				timeout=None
 			)
 			
 			if result.returncode != 0:
-				QMessageBox.critical(
-					self,
-					"Error",
-					f"Solver failed:\n{result.stderr}"
-				)
+				QMessageBox.critical(self, "Error", f"Solver failed:\n{result.stderr}")
 				return
 			
-			# Parse JSON output
 			output = result.stdout.strip()
 			data = json.loads(output)
 			
 			if "moves" in data:
 				self.solution_moves = data["moves"]
 				self.play_button.setEnabled(True)
-				QMessageBox.information(
-					self,
-					"Success",
-					f"Solution found:  {len(self.solution_moves)} moves"
-				)
+				
+				num_moves = len(self.solution_moves)
+				total_searched = data.get("total_searched", "N/A")
+				peak_states = data.get("peak_memory_states", "N/A")
+				peak_bytes = data.get("peak_memory_bytes", "N/A")
+
+				if isinstance(peak_bytes, int):
+					if peak_bytes < 1024:
+						mem_str = f"{peak_bytes} bytes"
+					elif peak_bytes < 1024 * 1024:
+						mem_str = f"{peak_bytes / 1024:.2f} KB"
+					else:
+						mem_str = f"{peak_bytes / (1024 * 1024):.2f} MB"
+				else:
+					mem_str = str(peak_bytes)
+
+				stats_text = (f"Solution: {num_moves} moves | "
+							f"Searched: {total_searched} boards | "
+							f"Peak Memory: {peak_states} states ({mem_str})")
+				self.stats_label.setText(stats_text)
+				self.stats_label.setStyleSheet("font-size: 10pt; color: #5cb85c; background: transparent;")
+				
+				QMessageBox.information(self, "Success", 
+					f"Solution found!\n\n"
+					f"Moves: {num_moves}\n"
+					f"Boards searched: {total_searched}\n"
+					f"Peak memory: {peak_states} states ({mem_str})")
 			else:
 				QMessageBox.critical(self, "Error", "Invalid response format")
 				
 		except subprocess.TimeoutExpired:
 			QMessageBox.critical(self, "Error", "Solver timed out")
 		except FileNotFoundError:
-			QMessageBox.critical(
-				self,
-				"Error",
-				"Executable 'n-puzzle' not found in current directory"
-			)
+			QMessageBox.critical(self, "Error", "Executable 'n-puzzle' not found in current directory")
 		except json.JSONDecodeError:
-			QMessageBox.critical(
-				self,
-				"Error",
-				f"Invalid JSON response:\n{result.stdout}"
-			)
+			QMessageBox.critical(self, "Error", f"Invalid JSON response:\n{result.stdout}")
 		except Exception as e:
 			QMessageBox.critical(self, "Error", f"Unexpected error:\n{str(e)}")
 			
 	def _play_solution(self):
-		"""Animate the solution step by step."""
 		if not self.solution_moves:
 			QMessageBox.warning(self, "Warning", "No solution to play")
 			return
-			
 		if self.animation_running:
 			return
-			
 		self.animation_running = True
 		self.current_move_index = 0
 		self._disable_buttons()
-		
-		# Start animation timer with current speed
 		self.animation_timer.start(self.animation_speed_ms)
 		
 	def _animation_tick(self):
-		"""Handle one animation frame."""
 		if self.current_move_index >= len(self.solution_moves):
-			# Animation complete
 			self.animation_timer.stop()
 			self.animation_running = False
 			self._enable_buttons()
 			return
 			
 		move = self.solution_moves[self.current_move_index]
-		
-		# Apply move:  1=up, 2=down, 3=left, 4=right
 		success = self._apply_move(move)
 		
 		if not success:
 			self.animation_timer.stop()
-			QMessageBox.critical(
-				self,
-				"Error",
-				f"Invalid move at step {self.current_move_index + 1}"
-			)
+			QMessageBox.critical(self, "Error", f"Invalid move at step {self.current_move_index + 1}")
 			self.animation_running = False
 			self._enable_buttons()
 			return
@@ -512,30 +510,24 @@ class NPuzzleGUI(QMainWindow):
 		self.current_move_index += 1
 		
 	def _apply_move(self, move: int) -> bool:
-		"""
-		Apply a move to the puzzle.
-		Moves: 1=up, 2=down, 3=left, 4=right (moving the empty tile)
-		Returns True if move was valid, False otherwise.
-		"""
 		row, col = self.empty_pos
 		new_row, new_col = row, col
-		
-		if move == 1:  # Move empty tile up
-			new_row -= 1
-		elif move == 2:  # Move empty tile down
-			new_row += 1
-		elif move == 3:  # Move empty tile left
-			new_col -= 1
-		elif move == 4:  # Move empty tile right
-			new_col += 1
-		else:
-			return False
-			
-		# Check bounds
+
+		match move:
+			case 1:
+				new_row -= 1
+			case 2:
+				new_row += 1
+			case 3:
+				new_col -= 1
+			case 4:
+				new_col += 1
+			case _:
+				return False
+
 		if not (0 <= new_row < self.n and 0 <= new_col < self.n):
 			return False
 			
-		# Swap empty tile with target tile
 		old_idx = row * self.n + col
 		new_idx = new_row * self.n + new_col
 		
@@ -545,7 +537,6 @@ class NPuzzleGUI(QMainWindow):
 		return True
 		
 	def _disable_buttons(self):
-		"""Disable control buttons during animation."""
 		self.gen_button.setEnabled(False)
 		self.solve_button.setEnabled(False)
 		self.play_button.setEnabled(False)
@@ -553,7 +544,6 @@ class NPuzzleGUI(QMainWindow):
 		self.speed_slider.setEnabled(False)
 		
 	def _enable_buttons(self):
-		"""Enable control buttons after animation."""
 		self.gen_button.setEnabled(True)
 		self.solve_button.setEnabled(True)
 		self.n_combo.setEnabled(True)
@@ -563,7 +553,6 @@ class NPuzzleGUI(QMainWindow):
 
 
 def main():
-	"""Main entry point."""
 	app = QApplication(sys.argv)
 	window = NPuzzleGUI()
 	window.show()
