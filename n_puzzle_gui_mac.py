@@ -44,6 +44,7 @@ class NPuzzleGUI(QMainWindow):
 
 		self.n = 3
 		self.grid: List[int] = []
+		self.initial_grid: List[int] = []
 		self.solution_moves: List[int] = []
 		self.animation_running = False
 		self.empty_pos:  Tuple[int, int] = (0, 0)
@@ -129,7 +130,25 @@ class NPuzzleGUI(QMainWindow):
 			QPushButton:disabled { background-color: #555; color: #aaa; }""")
 		self.gen_button.clicked.connect(self._generate_puzzle)
 		control_layout.addWidget(self.gen_button)
-		
+
+		self.reset_button = QPushButton("Reset")
+		self.reset_button.setStyleSheet(
+			"""QPushButton
+			{
+				background-color: #d9534f;
+				color: white;
+				font-size: 12pt;
+				font-weight: bold;
+				padding: 8px 15px;
+				border: none;
+				border-radius: 4px;
+			}
+			QPushButton:hover { background-color: #c9302c; }
+			QPushButton:pressed { background-color: #ac2925; }
+			QPushButton:disabled { background-color: #555; color: #aaa; }""")
+		self.reset_button.clicked.connect(self._reset_puzzle)
+		control_layout.addWidget(self.reset_button)
+
 		self.solve_button = QPushButton("Solve")
 		self.solve_button.setStyleSheet(
 			"""QPushButton
@@ -363,6 +382,7 @@ class NPuzzleGUI(QMainWindow):
 			self.n = n
 			self.n_combo.setCurrentText(str(n))
 			self.grid = grid_values
+			self.initial_grid = grid_values.copy()
 			self._update_empty_pos()
 			self.solution_moves.clear()
 			self.play_button.setEnabled(False)
@@ -390,6 +410,8 @@ class NPuzzleGUI(QMainWindow):
 		moves_per_second = value / 2.0
 		self.animation_speed_ms = int(1000 / moves_per_second)
 		self.speed_value_label.setText(f"{moves_per_second:.1f} moves/sec")
+		if self.animation_running:
+			self.animation_timer.setInterval(self.animation_speed_ms)
 
 	def _on_heuristic_changed(self, value:  str):
 		self.selected_heuristic = value
@@ -427,7 +449,8 @@ class NPuzzleGUI(QMainWindow):
 	def _generate_puzzle(self):
 		self.grid = list(range(self.n * self.n))
 		random.shuffle(self.grid)
-		
+
+		self.initial_grid = self.grid.copy()
 		self._update_empty_pos()
 		self.solution_moves.clear()
 		self.play_button.setEnabled(False)
@@ -545,7 +568,7 @@ class NPuzzleGUI(QMainWindow):
 			QMessageBox.critical(self, "Error", f"Invalid JSON response:\n{result.stdout}")
 		except Exception as e:
 			QMessageBox.critical(self, "Error", f"Unexpected error:\n{str(e)}")
-			
+		
 	def _play_solution(self):
 		if not self.solution_moves:
 			QMessageBox.warning(self, "Warning", "No solution to play")
@@ -556,6 +579,15 @@ class NPuzzleGUI(QMainWindow):
 		self.current_move_index = 0
 		self._disable_buttons()
 		self.animation_timer.start(self.animation_speed_ms)
+
+	def _reset_puzzle(self):
+		if not hasattr(self, 'initial_grid') or not self.initial_grid:
+			QMessageBox.warning(self, "Warning", "No initial puzzle to reset to")
+			return
+		
+		self.grid = self.initial_grid.copy()
+		self._update_empty_pos()
+		self._draw_grid()
 		
 	def _animation_tick(self):
 		if self.current_move_index >= len(self.solution_moves):
@@ -603,19 +635,19 @@ class NPuzzleGUI(QMainWindow):
 		self.empty_pos = (new_row, new_col)
 		
 		return True
-		
+	
 	def _disable_buttons(self):
 		self.gen_button.setEnabled(False)
+		self.reset_button.setEnabled(False)
 		self.solve_button.setEnabled(False)
 		self.play_button.setEnabled(False)
 		self.n_combo.setEnabled(False)
-		self.speed_slider.setEnabled(False)
 		
 	def _enable_buttons(self):
 		self.gen_button.setEnabled(True)
+		self.reset_button.setEnabled(True)
 		self.solve_button.setEnabled(True)
 		self.n_combo.setEnabled(True)
-		self.speed_slider.setEnabled(True)
 		if self.solution_moves:
 			self.play_button.setEnabled(True)
 
