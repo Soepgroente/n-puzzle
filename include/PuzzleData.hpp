@@ -9,7 +9,7 @@ typedef uint32_t ui32;
 
 class PuzzleData
 {
-	using HeuristicFunction = ui32 (*)(const std::vector<ui32>&, const std::vector<ui32>&, int);
+	using HeuristicFunction = int (*)(const std::vector<ui32>&, const std::vector<ui32>&, int);
 	using TimePoint = std::chrono::high_resolution_clock::time_point;
 
 	public:

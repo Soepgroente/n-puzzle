@@ -16,7 +16,7 @@
 	#error "Unsupported platform"
 #endif
 
-ui32	manhattanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);
-ui32	linearConflict(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);
-ui32	hammingDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);
-ui32	euclideanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);
+int	manhattanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);
+int	linearConflict(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);
+int	hammingDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);
+int	euclideanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);

@@ -8,10 +8,10 @@
 int PuzzleData::n = 0;
 int PuzzleData::size = 0;
 
-static bool	isEven(ui32 number)
-{
-	return (number % 2) == 0;
-}
+// static bool	isEven(ui32 number)
+// {
+// 	return (number % 2) == 0;
+// }
 
 static void	checkInitialConfiguration(Board& board)
 {
@@ -129,16 +129,16 @@ void	PuzzleData::init(const std::vector<ui32>& initialState)
 	checkInitialConfiguration(initialBoard);
 	addState(initialBoard);
 	setSolution();
-	ui32 inversions = countInversions();
+	// ui32 inversions = countInversions();
 
-	if (isEven(n) == false && isEven(inversions) == false)
-	{
-		throw std::invalid_argument("Initial configuration is not solvable: odd number of inversions in odd-sized puzzle");
-	}
-	if (isEven(n) == true && isEven(initialBoard.emptyTile / n + 1) == isEven(inversions))
-	{
-		throw std::invalid_argument("Initial configuration is not solvable: parity condition failed for even-sized puzzle");
-	}
+	// if (isEven(n) == false && isEven(inversions) == false)
+	// {
+	// 	throw std::invalid_argument("Initial configuration is not solvable: odd number of inversions in odd-sized puzzle");
+	// }
+	// if (isEven(n) == true && isEven(initialBoard.emptyTile / n + 1) == isEven(inversions))
+	// {
+	// 	throw std::invalid_argument("Initial configuration is not solvable: parity condition failed for even-sized puzzle");
+	// }
 }
 
 void	PuzzleData::parseHeuristics()

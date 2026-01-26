@@ -2,7 +2,7 @@
 #include "Board.hpp"
 #include "PuzzleData.hpp"
 
-ui32	manhattanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
+int	manhattanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
 {
 	ui32	distance = 0;
 	int size = static_cast<int>(tiles.size());
@@ -25,7 +25,7 @@ ui32	manhattanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& 
 	return distance;
 }
 
-ui32	linearConflict(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
+int	linearConflict(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
 {
 	ui32	inversionCount = 0;
 	const std::vector<ui32>&	si = solutionIndexes;
@@ -43,7 +43,7 @@ ui32	linearConflict(const std::vector<ui32>& tiles, const std::vector<ui32>& sol
 	return inversionCount * 2;
 }
 
-ui32	hammingDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
+int	hammingDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
 {
 	ui32	distance = 0;
 
@@ -59,7 +59,7 @@ ui32	hammingDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& so
 	return distance;
 }
 
-ui32	euclideanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
+int	euclideanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
 {
 	float	distance = 0;
 	int size = static_cast<int>(tiles.size());
@@ -95,5 +95,5 @@ ui32	PuzzleData::calculateHeuristicValue(const Board& board)
 	{
 		result += heuristics[i](tiles, solutionIndexes, n);
 	}
-	return result;
+	return static_cast<ui32>(result);
 }

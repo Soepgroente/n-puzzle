@@ -57,7 +57,7 @@ class NPuzzleGUI(QMainWindow):
 		self.animation_timer.timeout.connect(self._animation_tick)
 		self.current_move_index = 0
 		self.animation_speed_ms = 500
-		self.selected_heuristic = "none"
+		self.selected_heuristic = "manhattan"
 		self.selected_puzzle_file = None
 
 		self.resize_timer = QTimer()

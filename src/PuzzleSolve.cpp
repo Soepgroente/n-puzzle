@@ -142,7 +142,7 @@ void	PuzzleData::printSolution(std::ostream& os)	const noexcept
 
 	if (size == 0)
 	{
-		os << "Error: path solution size is 0" << std::endl;
+		os << "Something went wrong or puzzle was already solved!" << std::endl;
 		return ;
 	}
 	os << "{\"moves\": [";
