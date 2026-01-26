@@ -285,7 +285,6 @@ class NPuzzleGUI(QMainWindow):
 		heuristic_layout.addStretch()
 		main_layout.addLayout(heuristic_layout)
 
-		# Stats display
 		stats_layout = QHBoxLayout()
 		stats_layout.setSpacing(15)
 
@@ -317,6 +316,69 @@ class NPuzzleGUI(QMainWindow):
 		puzzle_files = sorted([f.name for f in puzzle_dir.iterdir() if f.is_file()])
 		return puzzle_files
 
+	def _load_puzzle_from_file(self, filepath: str):
+		"""Load a puzzle from a file and display it in the GUI."""
+		try:
+			with open(filepath, 'r') as f:
+				lines = f.readlines()
+			
+			grid_rows = []
+			
+			for line in lines:
+				# Remove comments (everything after #)
+				if '#' in line:
+					line = line[:line.index('#')]
+				
+				# Strip whitespace
+				line = line.strip()
+				
+				# Skip empty lines
+				if not line:
+					continue
+				
+				# Split into tokens and parse as integers
+				tokens = line.split()
+				row = [int(token) for token in tokens]
+				grid_rows.append(row)
+			
+			# Validate - all rows should have same length
+			if not grid_rows:
+				raise ValueError("No grid data found in file")
+			
+			n = len(grid_rows)
+			
+			# Check all rows have correct length
+			for i, row in enumerate(grid_rows):
+				if len(row) != n:
+					raise ValueError(f"Row {i} has {len(row)} values, expected {n}")
+			
+			# Flatten to 1D list
+			grid_values = [val for row in grid_rows for val in row]
+			
+			# Validate total count
+			if len(grid_values) != n * n:
+				raise ValueError(f"Expected {n * n} values, found {len(grid_values)}")
+			
+			# Update GUI
+			self.n = n
+			self.n_combo.setCurrentText(str(n))
+			self.grid = grid_values
+			self._update_empty_pos()
+			self.solution_moves.clear()
+			self.play_button.setEnabled(False)
+			self.stats_label.setText("Stats: No solution yet")
+			self.stats_label.setStyleSheet("font-size: 10pt; color: #aaa; background: transparent;")
+			
+			# Clear and redraw
+			self.scene.clear()
+			self.tile_rects.clear()
+			self.tile_texts.clear()
+			self._update_view_size()
+			self._draw_grid()
+			
+		except Exception as e:
+			QMessageBox.critical(self, "Error", f"Failed to load puzzle file:\n{str(e)}")
+
 	def resizeEvent(self, a0):
 		super().resizeEvent(a0)
 		self.resize_timer.start(100)
@@ -334,6 +396,12 @@ class NPuzzleGUI(QMainWindow):
 
 	def _on_puzzle_file_changed(self, index: int):
 		self.selected_puzzle_file = self.puzzle_combo.itemData(index)
+		
+		if self.selected_puzzle_file:
+			filepath = f"puzzles/{self.selected_puzzle_file}"
+			self._load_puzzle_from_file(filepath)
+		else:
+			self._generate_puzzle()
 		
 	def _update_view_size(self):
 		max_canvas_size = 1080
@@ -415,7 +483,7 @@ class NPuzzleGUI(QMainWindow):
 		cmd = ['./n-puzzle']
 		
 		if self.selected_puzzle_file:
-			cmd.append(f"puzzles/{self.selected_puzzle_file}")
+			cmd.append(f"{self.selected_puzzle_file}")
 			input_data = self.selected_heuristic
 		else:
 			input_data = f"{self.selected_heuristic}\n{' '.join(map(str, self.grid))}"
