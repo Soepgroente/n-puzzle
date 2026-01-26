@@ -41,6 +41,7 @@ void	Board::up() noexcept
 	tiles[emptyTile] ^= tiles[emptyTile - PuzzleData::n];
 	tiles[emptyTile - PuzzleData::n] ^= tiles[emptyTile];
 	tiles[emptyTile] ^= tiles[emptyTile - PuzzleData::n];
+	emptyTile -= PuzzleData::n;
 }
 
 void	Board::down() noexcept
@@ -48,6 +49,7 @@ void	Board::down() noexcept
 	tiles[emptyTile] ^= tiles[emptyTile + PuzzleData::n];
 	tiles[emptyTile + PuzzleData::n] ^= tiles[emptyTile];
 	tiles[emptyTile] ^= tiles[emptyTile + PuzzleData::n];
+	emptyTile += PuzzleData::n;
 }
 
 void	Board::left() noexcept
@@ -55,6 +57,7 @@ void	Board::left() noexcept
 	tiles[emptyTile] ^= tiles[emptyTile - 1];
 	tiles[emptyTile - 1] ^= tiles[emptyTile];
 	tiles[emptyTile] ^= tiles[emptyTile - 1];
+	emptyTile -= 1;
 }
 
 void	Board::right() noexcept
@@ -62,6 +65,7 @@ void	Board::right() noexcept
 	tiles[emptyTile] ^= tiles[emptyTile + 1];
 	tiles[emptyTile + 1] ^= tiles[emptyTile];
 	tiles[emptyTile] ^= tiles[emptyTile + 1];
+	emptyTile += 1;
 }
 
 std::ostream& operator<<(std::ostream& os, const Board& board)

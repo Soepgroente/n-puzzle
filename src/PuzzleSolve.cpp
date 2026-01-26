@@ -58,18 +58,17 @@ int	PuzzleData::findSensibleMoves(Board& board) noexcept
 void	PuzzleData::loopPathBackwards()
 {
 	Board	currentBoard = solution;
-	std::vector<ui32>	reversedSolution;
 
 	while (cameFrom.find(currentBoard) != cameFrom.end())
 	{
 		Board	parentBoard = cameFrom[currentBoard];
 		ui32	move = 0;
 
-		if (currentBoard.emptyTile == parentBoard.emptyTile - n)
+		if (currentBoard.emptyTile == parentBoard.emptyTile - static_cast<int>(n))
 		{
 			move = UP;
 		}
-		else if (currentBoard.emptyTile == parentBoard.emptyTile + n)
+		else if (currentBoard.emptyTile == parentBoard.emptyTile + static_cast<int>(n))
 		{
 			move = DOWN;
 		}
@@ -81,18 +80,16 @@ void	PuzzleData::loopPathBackwards()
 		{
 			move = RIGHT;
 		}
-		reversedSolution.push_back(move);
+		path.push_back(move);
 		currentBoard = parentBoard;
 	}
-	std::reverse(reversedSolution.begin(), reversedSolution.end());
-	path = reversedSolution;
+	std::reverse(path.begin(), path.end());
 }
 
 void	PuzzleData::solve() noexcept
 {
 	int moves;
 
-	std::cerr << "Made it here, " << openBoards.size() << " open boards" << std::endl;
 	while (openBoards.empty() == false)
 	{
 		Board currentBoard = openBoards.top();
@@ -109,27 +106,26 @@ void	PuzzleData::solve() noexcept
 			closedBoards.insert(currentBoard);
 			continue;
 		}
-		for (int direction = UP; direction <= RIGHT && (moves & (1 << direction)) != 0; direction++)
+		for (int direction = UP; direction <= RIGHT; direction++)
 		{
+			if ((moves & (1 << direction)) == 0)
+			{
+				continue;
+			}
 			Board newBoard = currentBoard;
-
-			cameFrom[newBoard] = currentBoard;
 
 			switch (direction)
 			{
-				case UP: newBoard.up(); break;
+				case UP: newBoard.up();  break;
 				case DOWN: newBoard.down(); break;
 				case LEFT: newBoard.left(); break;
 				case RIGHT: newBoard.right(); break;
 				default: break;
 			}
-			newBoard.distanceTraveled = newBoard.distanceTraveled + 1;
-			newBoard.heuristicValue = 0;
-			for (HeuristicFunction& heuristic : heuristics)
-			{
-				newBoard.heuristicValue += heuristic(newBoard.tiles, solution.tiles, n);
-			}
+			newBoard.distanceTraveled++;
+			newBoard.heuristicValue = calculateHeuristicValue(newBoard);
 			newBoard.totalScore = newBoard.distanceTraveled + newBoard.heuristicValue;
+			cameFrom[newBoard] = currentBoard;
 			openBoards.push(newBoard);
 			largestOpenBoardSize = std::max(largestOpenBoardSize, openBoards.size());
 		}
@@ -142,6 +138,11 @@ void	PuzzleData::printSolution(std::ostream& os)	const noexcept
 	size_t	size = path.size();
 	size_t	boardStates = closedBoards.size() + openBoards.size();
 
+	if (size == 0)
+	{
+		os << "Error: path solution size is 0" << std::endl;
+		return ;
+	}
 	os << "{\"moves\": [";
 	for (size_t i = 0; i < size - 1; i++)
 	{

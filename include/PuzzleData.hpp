@@ -9,7 +9,7 @@ typedef uint32_t ui32;
 
 class PuzzleData
 {
-	using HeuristicFunction = ui32 (*)(const std::vector<ui32>&, const std::vector<ui32>&, ui32);
+	using HeuristicFunction = ui32 (*)(const std::vector<ui32>&, const std::vector<ui32>&, int);
 
 	public:
 
@@ -28,8 +28,8 @@ class PuzzleData
 	void	printSolution(std::ostream& os)	const noexcept;
 	void	solve() noexcept;
 
-	static ui32	n;
-	static ui32	size;
+	static int	n;
+	static int	size;
 
 	private:
 	

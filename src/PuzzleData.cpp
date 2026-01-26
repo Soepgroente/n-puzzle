@@ -5,8 +5,8 @@
 #include <sstream>
 #include <stdexcept>
 
-ui32 PuzzleData::n = 0;
-ui32 PuzzleData::size = 0;
+int PuzzleData::n = 0;
+int PuzzleData::size = 0;
 
 static bool	isEven(ui32 number)
 {
@@ -144,13 +144,11 @@ void	PuzzleData::init(const std::vector<ui32>& initialState)
 void	PuzzleData::parseHeuristics()
 {
 	std::string	input;
-	std::ofstream file("heuristics_log.txt");
 	std::getline(std::cin, input);
 
-	file << "Selected heuristic: " << input << std::endl;
-	if (input.empty() == true)
+	if (input.empty() == true || input == "none")
 	{
-		throw std::invalid_argument("No heuristics specified");
+		return ;
 	}
 	else if (input == "manhattan distance")
 	{
@@ -177,67 +175,52 @@ void	PuzzleData::parseHeuristics()
 	{
 		throw std::invalid_argument("Unknown heuristic: " + input);
 	}
-	file.close();
 }
 
 void	PuzzleData::configFromFile(const char* filename)
 {
 	parseHeuristics();
-	std::ifstream file(filename);
+	std::ifstream file(std::string("puzzles/") + filename);
 
 	if (file.is_open() == false)
 	{
 		throw std::invalid_argument("Could not open file: " + std::string(filename));
 	}
-	std::string line;
-	std::string	lineWithoutComments;
-	std::vector<ui32>	tiles;
+	std::vector<ui32>	startingConfiguration;
+	std::string	line;
+	int		rowCount;
+	ui32	tile;
 
 	while (file.eof() == false)
 	{
 		std::getline(file, line, '\n');
-		if (line.empty())
+		size_t	poundSign = line.find('#');
+
+		if (poundSign != std::string::npos)
 		{
-			continue;
+			line = line.substr(0, poundSign);
 		}
-		ui32 rowCount = 0;
-		std::string tile;
 		std::istringstream stream(line);
 
-		std::getline(stream, lineWithoutComments, '#');
-		stream.str(lineWithoutComments);
-
-		while (stream.eof() == false)
+		rowCount = 0;
+		while ((stream >> tile).fail() == false)
 		{
-			stream >> tile;
-			if (tile.empty())
-			{
-				continue;
-			}
-			while (tile[0] == ' ' || tile[0] == '\t')
-			{
-				tile.erase(0, 1);
-			}
-			try
-			{
-				tiles.push_back(std::stoi(tile));
-			}
-			catch (const std::exception&)
-			{
-				throw std::invalid_argument("Non-integer value in file: " + std::string(filename));
-			}
+			startingConfiguration.push_back(tile);
 			rowCount++;
 		}
-		if (PuzzleData::n == 0)
+		if (rowCount > 0)
 		{
-			PuzzleData::n = rowCount;
-		}
-		else if (PuzzleData::n != rowCount)
-		{
-			throw std::invalid_argument("Inconsistent row lengths in file: " + std::string(filename));
+			if (PuzzleData::n == 0)
+			{
+				PuzzleData::n = rowCount;
+			}
+			else if (PuzzleData::n != rowCount)
+			{
+				throw std::invalid_argument("Inconsistent row lengths in file: " + std::string(filename));
+			}
 		}
 	}
-	init(tiles);
+	init(startingConfiguration);
 }
 
 void	PuzzleData::configFromGUI()
@@ -245,12 +228,12 @@ void	PuzzleData::configFromGUI()
 	parseHeuristics();
 	std::string	line;
 	std::vector<ui32>	startingConfiguration;
+	ui32	value;
 	
-	while (std::getline(std::cin,line).fail() == false)
+	while (std::getline(std::cin, line).fail() == false)
 	{
 		std::stringstream	ss(line);
 
-		int	value;
 		while ((ss >> value).fail() == false)
 		{
 			startingConfiguration.push_back(value);

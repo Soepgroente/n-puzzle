@@ -32,7 +32,7 @@ struct Board
 
 	std::vector<ui32>	tiles;
 
-	ui32	emptyTile;
+	int		emptyTile;
 	ui32	distanceTraveled;
 	ui32	heuristicValue;
 	ui32	totalScore;
