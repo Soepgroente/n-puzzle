@@ -84,12 +84,14 @@ void	PuzzleData::loopPathBackwards()
 		currentBoard = parentBoard;
 	}
 	std::reverse(path.begin(), path.end());
+	endTime = std::chrono::high_resolution_clock::now();
 }
 
 void	PuzzleData::solve() noexcept
 {
 	int moves;
 
+	startTime = std::chrono::high_resolution_clock::now();
 	while (openBoards.empty() == false)
 	{
 		Board currentBoard = openBoards.top();
@@ -153,6 +155,7 @@ void	PuzzleData::printSolution(std::ostream& os)	const noexcept
 		os << path[size - 1];
 	}
 	os << "],\n";
+	os << "\"time_ms\": " << std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() << ",\n";
 	os << "\"total_searched\": " << boardStates << ",\n";
 	os << "\"peak_memory_states\": " << boardStates << ",\n";
 	os << "\"peak_memory_bytes\": " << boardStates * sizeof(Board) << "\n}" << std::endl;

@@ -532,6 +532,7 @@ class NPuzzleGUI(QMainWindow):
 				self.play_button.setEnabled(True)
 				
 				num_moves = len(self.solution_moves)
+				time_ms = data.get("time_ms", "N/A")
 				total_searched = data.get("total_searched", "N/A")
 				peak_states = data.get("peak_memory_states", "N/A")
 				peak_bytes = data.get("peak_memory_bytes", "N/A")
@@ -545,9 +546,17 @@ class NPuzzleGUI(QMainWindow):
 						mem_str = f"{peak_bytes / (1024 * 1024):.2f} MB"
 				else:
 					mem_str = str(peak_bytes)
+				if isinstance(time_ms, int):
+					if time_ms < 1000:
+						time_ms = str(time_ms)
+					elif time_ms < 1000 * 60:
+						time_ms = f"{time_ms / 1000:.2f} sec"
+					else:
+						time_ms = f"{time_ms / (1000 * 60)}:{time_ms % (1000 * 60) / 1000:.2f}"
 
 				stats_text = (f"Solution: {num_moves} moves | "
-							f"Searched: {total_searched} boards | "
+							f"Time: {time_ms} ms | "
+				  			f"Searched: {total_searched} boards | "
 							f"Peak Memory: {peak_states} states ({mem_str})")
 				self.stats_label.setText(stats_text)
 				self.stats_label.setStyleSheet("font-size: 10pt; color: #5cb85c; background: transparent;")
