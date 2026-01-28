@@ -59,31 +59,6 @@ int	hammingDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& sol
 	return distance;
 }
 
-int	euclideanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
-{
-	float	distance = 0;
-	int size = static_cast<int>(tiles.size());
-
-	for (int index = 0; index < size; index++)
-	{
-		int	tile = tiles[index];
-
-		if (tile != 0)
-		{
-			int	targetIndex = solutionIndexes[tile - 1];
-			int	currentRow = index / n;
-			int	currentCol = index % n;
-			int	targetRow = targetIndex / n;
-			int	targetCol = targetIndex % n;
-			int	dx = currentRow - targetRow;
-			int	dy = currentCol - targetCol;
-
-			distance += std::sqrt(dx * dx + dy * dy);
-		}
-	}
-	return static_cast<ui32>(distance);
-}
-
 ui32	PuzzleData::calculateHeuristicValue(const Board& board)
 {
 	int result = 0;

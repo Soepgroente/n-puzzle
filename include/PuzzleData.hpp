@@ -14,7 +14,7 @@ class PuzzleData
 
 	public:
 
-	PuzzleData() = default;
+	PuzzleData();
 	~PuzzleData() = default;
 	PuzzleData(const PuzzleData &other) = delete;
 	PuzzleData& operator=(const PuzzleData &other) = delete;
@@ -26,7 +26,7 @@ class PuzzleData
 	void	addState(const Board& board);
 	int		findSensibleMoves(Board& board) noexcept;
 	void	setSolution();
-	void	printSolution(std::ostream& os)	const noexcept;
+	void	printSolution(std::ostream& os)	noexcept;
 	void	solve() noexcept;
 
 	static int	n;
@@ -43,13 +43,15 @@ class PuzzleData
 	std::vector<ui32>	solutionIndexes;
 	std::vector<ui32>	path;
 
-	int		previousMove = 0;
 	size_t	largestOpenBoardSize = 0;
+	size_t	peakMemoryUsage = 0;
+	size_t	availableRamSize;
 
-	ui32	countInversions();
 	ui32	calculateHeuristicValue(const Board& board);
 	void	parseHeuristics();
 	void	loopPathBackwards();
+
+	bool	greedySearch = false;
 
 	TimePoint	startTime;
 	TimePoint	endTime;

@@ -19,4 +19,3 @@
 int	manhattanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);
 int	linearConflict(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);
 int	hammingDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);
-int	euclideanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n);

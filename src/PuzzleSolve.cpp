@@ -16,7 +16,7 @@ int	PuzzleData::findSensibleMoves(Board& board) noexcept
 {
 	int	legalmoves = 0;
 
-	if (previousMove != DOWN && board.emptyTile - n >= 0)
+	if (board.emptyTile - n >= 0)
 	{
 		board.up();
 		if (closedBoards.count(board) == 0)
@@ -25,7 +25,7 @@ int	PuzzleData::findSensibleMoves(Board& board) noexcept
 		}
 		board.down();
 	}
-	if (previousMove != UP && board.emptyTile + n < size)
+	if (board.emptyTile + n < size)
 	{
 		board.down();
 		if (closedBoards.count(board) == 0)
@@ -34,7 +34,7 @@ int	PuzzleData::findSensibleMoves(Board& board) noexcept
 		}
 		board.up();
 	}
-	if (previousMove != RIGHT && board.emptyTile % n != 0)
+	if (board.emptyTile % n != 0)
 	{
 		board.left();
 		if (closedBoards.count(board) == 0)
@@ -43,7 +43,7 @@ int	PuzzleData::findSensibleMoves(Board& board) noexcept
 		}
 		board.right();
 	}
-	if (previousMove != LEFT && board.emptyTile % n != n - 1)
+	if (board.emptyTile % n != n - 1)
 	{
 		board.right();
 		if (closedBoards.count(board) == 0)
@@ -89,11 +89,19 @@ void	PuzzleData::loopPathBackwards()
 
 void	PuzzleData::solve() noexcept
 {
-	int moves;
+	int	moves;
+	size_t	memoryFootPrint = sizeof(Board) + sizeof(void*) * 2;
 
 	startTime = std::chrono::high_resolution_clock::now();
 	while (openBoards.empty() == false)
 	{
+		peakMemoryUsage = std::max(peakMemoryUsage, closedBoards.size() * memoryFootPrint + openBoards.size() * memoryFootPrint);
+		if (peakMemoryUsage >= availableRamSize)
+		{
+			endTime = std::chrono::high_resolution_clock::now();
+			std::cout << "Memory limit reached, aborting search." << std::endl;
+			break;
+		}
 		Board currentBoard = openBoards.top();
 
 		openBoards.pop();
@@ -126,7 +134,14 @@ void	PuzzleData::solve() noexcept
 			}
 			newBoard.distanceTraveled++;
 			newBoard.heuristicValue = calculateHeuristicValue(newBoard);
-			newBoard.totalScore = newBoard.distanceTraveled + newBoard.heuristicValue;
+			if (greedySearch == true)
+			{
+				newBoard.totalScore = newBoard.heuristicValue;
+			}
+			else
+			{
+				newBoard.totalScore = newBoard.distanceTraveled + newBoard.heuristicValue;
+			}
 			cameFrom[newBoard] = currentBoard;
 			openBoards.push(newBoard);
 			largestOpenBoardSize = std::max(largestOpenBoardSize, openBoards.size());
@@ -135,14 +150,20 @@ void	PuzzleData::solve() noexcept
 	}
 }
 
-void	PuzzleData::printSolution(std::ostream& os)	const noexcept
+void	PuzzleData::printSolution(std::ostream& os)	noexcept
 {
 	size_t	size = path.size();
-	size_t	boardStates = closedBoards.size() + openBoards.size();
-
+	size_t	boardStates = closedBoards.size();
+	
+	endTime = std::chrono::high_resolution_clock::now();
+	if (openBoards.empty() == true)
+	{
+		std::cout << "No solution found!" << std::endl;
+		return ;
+	}
 	if (size == 0)
 	{
-		os << "Something went wrong or puzzle was already solved!" << std::endl;
+		os << "Puzzle was already solved!" << std::endl;
 		return ;
 	}
 	os << "{\"moves\": [";

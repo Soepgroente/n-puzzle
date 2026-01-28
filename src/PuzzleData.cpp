@@ -4,21 +4,39 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#ifdef __linux__
+	#include <sys/sysinfo.h>
+#elif __APPLE__
+	#include <sys/types.h>
+	#include <sys/sysctl.h>
+#endif
 
 int PuzzleData::n = 0;
 int PuzzleData::size = 0;
 
-// static bool	isEven(ui32 number)
-// {
-// 	return (number % 2) == 0;
-// }
+PuzzleData::PuzzleData()
+{
+	#ifdef __linux__
+		struct sysinfo info;
+		sysinfo(&info);
+		availableRamSize = info.totalram / (sizeof(Board) + sizeof(void*) * 2);
+	#elif __APPLE__
+		int mib[2] = {CTL_HW, HW_MEMSIZE};
+		size_t memsize;
+		size_t len = sizeof(memsize);
+		sysctl(mib, 2, &memsize, &len, NULL, 0);
+		availableRamSize = memsize / (sizeof(Board) + sizeof(void*) * 2);
+	#else
+		availableRamSize = 8 * 1024 * 1024 * 1024 / (sizeof(Board) + sizeof(void*) * 2); // Default to 8GB RAM
+	#endif
+}
 
 static void	checkInitialConfiguration(Board& board)
 {
 	size_t	size = board.tiles.size();
 	std::vector<bool>	seen(size, false);
-
 	PuzzleData::size = static_cast<ui32>(size);
+
 	if (PuzzleData::n == 0)
 	{
 		PuzzleData::n = static_cast<ui32>(std::sqrt(size));
@@ -88,26 +106,6 @@ static std::vector<ui32>	getReadingOrder()
 	return readingOrder;
 }
 
-ui32	PuzzleData::countInversions()
-{
-	const Board& initialBoard = openBoards.top();
-	ui32	inversionCount = 0;
-	const std::vector<ui32>&	si = solutionIndexes;
-
-	for (size_t i = 0; i < initialBoard.tiles.size(); i++)
-	{
-		for (size_t j = i + 1; j < initialBoard.tiles.size(); j++)
-		{
-			if (initialBoard.tiles[si[i]] != 0 && initialBoard.tiles[si[j]] != 0 &&
-				initialBoard.tiles[si[i]] > initialBoard.tiles[si[j]])
-			{
-				inversionCount++;
-			}
-		}
-	}
-	return inversionCount;
-}
-
 void	PuzzleData::setSolution()
 {
 	solutionIndexes = getReadingOrder();
@@ -129,16 +127,6 @@ void	PuzzleData::init(const std::vector<ui32>& initialState)
 	checkInitialConfiguration(initialBoard);
 	addState(initialBoard);
 	setSolution();
-	// ui32 inversions = countInversions();
-
-	// if (isEven(n) == false && isEven(inversions) == false)
-	// {
-	// 	throw std::invalid_argument("Initial configuration is not solvable: odd number of inversions in odd-sized puzzle");
-	// }
-	// if (isEven(n) == true && isEven(initialBoard.emptyTile / n + 1) == isEven(inversions))
-	// {
-	// 	throw std::invalid_argument("Initial configuration is not solvable: parity condition failed for even-sized puzzle");
-	// }
 }
 
 void	PuzzleData::parseHeuristics()
@@ -146,27 +134,28 @@ void	PuzzleData::parseHeuristics()
 	std::string	input;
 	std::getline(std::cin, input);
 
-	if (input.empty() == true || input == "none")
+	if (input == "Greedy search enabled")
+	{
+		greedySearch = true;
+		std::getline(std::cin, input);
+	}
+	if (input.empty() == true || input == "none" || input == "Dijkstra (no heuristic)")
 	{
 		return ;
 	}
-	else if (input == "manhattan distance")
+	else if (input == "Manhattan distance")
 	{
 		heuristics.push_back(&manhattanDistance);
 	}
-	else if (input == "linear conflict")
+	else if (input == "Linear conflict")
 	{
 		heuristics.push_back(&linearConflict);
 	}
-	else if (input == "hamming distance")
+	else if (input == "Hamming distance")
 	{
 		heuristics.push_back(&hammingDistance);
 	}
-	else if (input == "euclidean distance")
-	{
-		heuristics.push_back(&euclideanDistance);
-	}
-	else if (input == "manhattan + LC")
+	else if (input == "Manhattan + LC")
 	{
 		heuristics.push_back(&manhattanDistance);
 		heuristics.push_back(&linearConflict);

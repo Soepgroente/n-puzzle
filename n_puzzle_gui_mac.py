@@ -57,7 +57,7 @@ class NPuzzleGUI(QMainWindow):
 		self.animation_timer.timeout.connect(self._animation_tick)
 		self.current_move_index = 0
 		self.animation_speed_ms = 500
-		self.selected_heuristic = "manhattan"
+		self.selected_heuristic = "Manhattan distance"
 		self.selected_puzzle_file = None
 
 		self.resize_timer = QTimer()
@@ -244,7 +244,7 @@ class NPuzzleGUI(QMainWindow):
 		heuristic_layout.addWidget(heuristic_label)
 
 		self.heuristic_combo = QComboBox()
-		self.heuristic_combo.addItems(["none", "manhattan distance", "linear conflict", "hamming distance", "euclidean distance", "manhattan + LC"])
+		self.heuristic_combo.addItems(["Manhattan distance", "Linear conflict", "Hamming distance", "Manhattan + LC", "Dijkstra (no heuristic)"])
 		self.heuristic_combo.setCurrentText("manhattan")
 		self.heuristic_combo.setStyleSheet("""
 			QComboBox {
@@ -267,6 +267,35 @@ class NPuzzleGUI(QMainWindow):
 		heuristic_layout.addWidget(self.heuristic_combo)
 
 		heuristic_layout.addSpacing(20)
+
+		heuristic_layout.addSpacing(20)
+
+		# Greedy search toggle button
+		self.greedy_button = QPushButton("Greedy Search")
+		self.greedy_button.setCheckable(True)
+		self.greedy_button.setChecked(False)
+		self.greedy_button.setStyleSheet("""
+			QPushButton {
+				background-color: #555;
+				color: #aaa;
+				font-size: 11pt;
+				font-weight: bold;
+				padding: 8px 15px;
+				border: none;
+				border-radius: 4px;
+			}
+			QPushButton:checked {
+				background-color: #90ee90;
+				color: #333;
+			}
+			QPushButton:checked:hover {
+				background-color: #7ad87a;
+			}
+			QPushButton:hover {
+				background-color: #666;
+			}
+		""")
+		heuristic_layout.addWidget(self.greedy_button)
 
 		# Puzzle file selector
 		puzzle_label = QLabel("Puzzle File:")
@@ -507,9 +536,15 @@ class NPuzzleGUI(QMainWindow):
 		
 		if self.selected_puzzle_file:
 			cmd.append(f"{self.selected_puzzle_file}")
-			input_data = self.selected_heuristic
+			if self.greedy_button.isChecked():
+				input_data = f"Greedy search enabled\n{self.selected_heuristic}"
+			else:
+				input_data = self.selected_heuristic
 		else:
-			input_data = f"{self.selected_heuristic}\n{' '.join(map(str, self.grid))}"
+			if self.greedy_button.isChecked():
+				input_data = f"Greedy search enabled\n{self.selected_heuristic}\n{' '.join(map(str, self.grid))}"
+			else:
+				input_data = f"{self.selected_heuristic}\n{' '.join(map(str, self.grid))}"
 		
 		try:
 			result = subprocess.run(
