@@ -1,5 +1,6 @@
 #include "PuzzleData.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <iomanip>
 
@@ -107,6 +108,7 @@ void	PuzzleData::solve() noexcept
 		openBoards.pop();
 		if (currentBoard == solution)
 		{
+			openBoards.push(currentBoard);
 			loopPathBackwards();
 			break;
 		}
@@ -163,7 +165,10 @@ void	PuzzleData::printSolution(std::ostream& os)	noexcept
 	}
 	if (size == 0)
 	{
-		os << "Puzzle was already solved!" << std::endl;
+		if (peakMemoryUsage < 1000)
+		{
+			os << "Puzzle was already solved!" << std::endl;
+		}
 		return ;
 	}
 	os << "{\"moves\": [";

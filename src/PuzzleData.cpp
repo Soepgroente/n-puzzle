@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <cmath>
 #ifdef __linux__
 	#include <sys/sysinfo.h>
 #elif __APPLE__
