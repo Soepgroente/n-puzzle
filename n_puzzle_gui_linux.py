@@ -42,9 +42,14 @@ class NPuzzleGUI:
 		self._base_image = None
 		self._tile_photoimages = {}
 		self._spiral_goal_map = None
-		
+		self._fade_overlay = None
+		self._fade_photo = None
+		self._fade_overlay_visible = False
+		self._fade_after_ids = []
+
 		self.setup_ui()
 		self.initialize_grid()
+		self.cancel_animation_event = threading.Event()
 		
 		self.resize_after_id = None
 		self.root.bind('<Configure>', self.on_window_resize)
@@ -293,6 +298,7 @@ class NPuzzleGUI:
 		self.selected_heuristic = self.heuristic_var.get()
 
 	def on_greedy_toggled(self):
+		self.hide_final_overlay()
 		self.greedy_search_enabled = not self.greedy_search_enabled
 		if self.greedy_search_enabled:
 			self.greedy_btn.config(bg="#90ee90", fg="#333", activebackground="#7ad87a")
@@ -332,6 +338,7 @@ class NPuzzleGUI:
 
 	def load_puzzle_from_file(self, filepath):
 		"""Load a puzzle from a file and display it."""
+		self.hide_final_overlay()
 		try:
 			with open(filepath, 'r') as f:
 				lines = f.readlines()
@@ -379,19 +386,30 @@ class NPuzzleGUI:
 		except Exception as e:
 			messagebox.showerror("Error", f"Failed to load puzzle file:\n{str(e)}")
 
-	def reset_puzzle(self):
-		"""Reset the puzzle to initial configuration."""
+	def restore_to_initial_grid(self):
+		"""Restore the board to the exact state that was solved (initial_grid)."""
 		if not self.initial_grid:
-			messagebox.showwarning("Warning", "No initial puzzle to reset to")
 			return
-		
+
 		self.grid = [row[:] for row in self.initial_grid]
-		
+
+		# recompute empty_pos
 		for i in range(self.n):
 			for j in range(self.n):
 				if self.grid[i][j] == 0:
 					self.empty_pos = (i, j)
-					break
+					return
+
+	def reset_puzzle(self):
+		"""Reset the puzzle to initial configuration."""
+		if self.is_playing == True:
+			return
+		self.hide_final_overlay()
+		if not self.initial_grid:
+			messagebox.showwarning("Warning", "No initial puzzle to reset to")
+			return
+		
+		self.restore_to_initial_grid()
 		
 		for i in range(self.n):
 			for j in range(self.n):
@@ -400,6 +418,7 @@ class NPuzzleGUI:
 		self.update_status("Puzzle reset to initial state")
 
 	def do_resize(self):
+		self.hide_final_overlay()
 		self.last_width = self.root.winfo_width()
 		self.last_height = self.root.winfo_height()
 		self.draw_grid()
@@ -456,6 +475,8 @@ class NPuzzleGUI:
 		
 	def draw_grid(self):
 		for widget in self.grid_frame.winfo_children():
+			if widget is self._fade_overlay:
+				continue
 			widget.destroy()
 		
 		self.tile_labels = []
@@ -530,6 +551,7 @@ class NPuzzleGUI:
 			lbl.config(text=str(value), image="", bg=self.tile_color, fg=self.text_color, relief=tk.RAISED)
 	
 	def on_n_changed(self, event):
+		self.hide_final_overlay()
 		self.solution_steps = []
 		self.play_btn.config(state=tk.DISABLED)
 		self._spiral_goal_map = None
@@ -537,6 +559,7 @@ class NPuzzleGUI:
 		self.update_status("Grid size changed.  Click Generate to create a puzzle.")
 	
 	def generate_puzzle(self):
+		self.hide_final_overlay()
 		self.n = self.n_var.get()
 		size = self.n * self.n
 		numbers = list(range(size))
@@ -565,6 +588,7 @@ class NPuzzleGUI:
 		return result
 	
 	def solve_puzzle(self):
+		self.hide_final_overlay()
 		self.update_status("Solving puzzle...")
 		self.solve_btn.config(state=tk.DISABLED)
 		self.cancel_btn.config(state=tk.NORMAL)
@@ -575,18 +599,23 @@ class NPuzzleGUI:
 		thread.start()
 	
 	def cancel_solve(self):
+		# If playing, cancel animation
+		if self.is_playing:
+			self.cancel_animation_event.set()
+			self.update_status("Cancelling animation...")
+			return
+
+		# Otherwise cancel solver subprocess (your existing logic)
 		if self.solver_process and self.solver_process.poll() is None:
-			# Process is still running
 			try:
-				if os.name == 'nt':   # Windows
+				if os.name == 'nt':
 					self.solver_process.terminate()
-				else:  # Unix/Linux/Mac
+				else:
 					self.solver_process.send_signal(signal.SIGTERM)
-				
 				self.update_status("Solver cancelled")
 			except Exception as e:
 				self.update_status(f"Error cancelling:  {e}")
-		
+
 		self.solve_btn.config(state=tk.NORMAL)
 		self.cancel_btn.config(state=tk.DISABLED)
 	
@@ -696,16 +725,21 @@ class NPuzzleGUI:
 		messagebox.showerror("Solver Error", error_msg)
 	
 	def play_solution(self):
+		self.hide_final_overlay()
 		if not self.solution_steps:
 			messagebox.showinfo("No Solution", "No solution available to play")
 			return
-		
 		if self.is_playing:
 			return
 		
+		self.restore_to_initial_grid()
+		self.refresh_picture_assets_and_tiles()
+		self.cancel_animation_event.clear()
+
 		self.generate_btn.config(state=tk.DISABLED)
 		self.solve_btn.config(state=tk.DISABLED)
 		self.play_btn.config(state=tk.DISABLED)
+		self.cancel_btn.config(state=tk.NORMAL)
 		
 		self.is_playing = True
 		self.update_status("Playing solution...")
@@ -715,17 +749,38 @@ class NPuzzleGUI:
 		thread.start()
 	
 	def animate_solution(self):
-		"""Animate each move in the solution"""
-		
 		for step_num, move in enumerate(self.solution_steps, 1):
+			if self.cancel_animation_event.is_set():
+				self.root.after(0, self.on_animation_cancelled)
+				return
+
 			delay = 1.0 / self.moves_per_second
 			time.sleep(delay)
+
+			if self.cancel_animation_event.is_set():
+				self.root.after(0, self.on_animation_cancelled)
+				return
+
 			self.root.after(0, lambda m=move, s=step_num: self.apply_move(m, s))
-		
+
+		# finished normally
 		delay = 1.0 / self.moves_per_second
 		time.sleep(delay)
+
+		if self.cancel_animation_event.is_set():
+			self.root.after(0, self.on_animation_cancelled)
+			return
+
 		self.root.after(0, self.on_animation_complete)
-	
+
+	def on_animation_cancelled(self):
+		self.is_playing = False
+		self.generate_btn.config(state=tk.NORMAL)
+		self.solve_btn.config(state=tk.NORMAL)
+		self.play_btn.config(state=tk.NORMAL)
+		self.cancel_btn.config(state=tk.DISABLED)
+		self.update_status("Animation cancelled")
+
 	def apply_move(self, move:  int, step_num: int):
 		"""Moves:  1=up, 2=down, 3=left, 4=right"""
 		row, col = self.empty_pos
@@ -805,6 +860,7 @@ class NPuzzleGUI:
 		return self._spiral_goal_map[r][c]
 
 	def on_picture_toggled(self):
+		self.hide_final_overlay()
 		self.picture_mode = not self.picture_mode
 
 		if self.picture_mode:
@@ -855,6 +911,123 @@ class NPuzzleGUI:
 				crop = board_img.crop((left, upper, right, lower))
 				self._tile_photoimages[correct_num] = ImageTk.PhotoImage(crop)
 
+	def capture_board_image(self):
+		"""
+		Reconstruct current board as a PIL image using the existing tile slices.
+		Requires picture_mode and _tile_photoimages to be available.
+		"""
+		tile = self.current_tile_size
+		n = self.n
+		board = Image.new("RGB", (tile * n, tile * n), (0, 0, 0))
+
+		# Need PIL crops; easiest: rebuild from base image in current size.
+		if self._base_image is None:
+			self._base_image = Image.open(self.snake_image_path).convert("RGB")
+
+		board_img = self._base_image.resize((tile * n, tile * n), Image.Resampling.LANCZOS)
+
+		# Paste slices according to CURRENT positions (value tells which slice to use)
+		# We can crop slice for where that tile belongs in the SOLVED layout.
+		for r in range(n):
+			for c in range(n):
+				v = self.grid[r][c]
+				if v == 0:
+					continue
+
+				# Find where tile v belongs in the goal layout, then crop that slice:
+				gr, gc = self.find_goal_position_for_tile(v)
+				crop = board_img.crop((gc * tile, gr * tile, (gc + 1) * tile, (gr + 1) * tile))
+				board.paste(crop, (c * tile, r * tile))
+
+		return board
+
+	def find_goal_position_for_tile(self, tile_value: int) -> tuple[int, int]:
+		"""Return (r,c) in the spiral goal where tile_value belongs."""
+		if self._spiral_goal_map is None or len(self._spiral_goal_map) != self.n:
+			self._spiral_goal_map = self.build_spiral_goal_map()
+		for r in range(self.n):
+			for c in range(self.n):
+				if self._spiral_goal_map[r][c] == tile_value:
+					return (r, c)
+		raise ValueError(f"Tile {tile_value} not found in goal map")
+
+	def fade_in_solved_picture(self, duration_ms=600, steps=12):
+		"""Fade from current board rendering to the complete solved picture."""
+		if not self.picture_mode:
+			return
+
+		tile = self.current_tile_size
+		n = self.n
+		w = tile * n
+		h = tile * n
+
+		# Base solved image (complete picture)
+		if self._base_image is None:
+			self._base_image = Image.open(self.snake_image_path).convert("RGB")
+		solved = self._base_image.resize((w, h), Image.Resampling.LANCZOS)
+
+		# Current board snapshot (reconstructed)
+		try:
+			start = self.capture_board_image()
+		except Exception:
+			# If anything fails, just skip fade
+			return
+
+		# Create overlay label once
+		if self._fade_overlay is None:
+			self._fade_overlay = tk.Label(self.grid_frame, bd=0)
+		self._fade_overlay.place(x=0, y=0, width=w, height=h)
+		self._fade_overlay.lift()
+		self._fade_overlay_visible = False
+
+		delay = max(1, duration_ms // steps)
+
+		def step(i):
+			t = i / steps
+			frame = Image.blend(start, solved, t)
+			self._fade_photo = ImageTk.PhotoImage(frame)
+			self._fade_overlay.config(image=self._fade_photo)
+
+			if i < steps:
+				aid = self.root.after(delay, lambda: step(i + 1))
+				self._fade_after_ids.append(aid)
+			else:
+				self._fade_overlay_visible = True
+
+		# cancel any previous scheduled fade steps
+		for aid in getattr(self, "_fade_after_ids", []):
+			try:
+				self.root.after_cancel(aid)
+			except Exception:
+				pass
+		self._fade_after_ids = []
+		step(0)
+	
+	def hide_final_overlay(self):
+		ov = self._fade_overlay
+		if ov is None:
+			self._fade_overlay_visible = False
+			self._fade_photo = None
+			return
+
+		try:
+			# If Tk already destroyed it, this will throw.
+			ov.place_forget()
+			ov.config(image="")
+		except tk.TclError:
+			# Overlay was destroyed (e.g. by draw_grid); drop the reference.
+			self._fade_overlay = None
+
+		self._fade_photo = None
+		self._fade_overlay_visible = False
+
+		for aid in getattr(self, "_fade_after_ids", []):
+			try:
+				self.root.after_cancel(aid)
+			except Exception:
+				pass
+		self._fade_after_ids = []
+
 	def refresh_picture_assets_and_tiles(self):
 		"""Rebuild cached spiral mapping + image slices (if enabled) and refresh all tiles."""
 		self._spiral_goal_map = None
@@ -872,6 +1045,8 @@ class NPuzzleGUI:
 		self.generate_btn.config(state=tk.NORMAL)
 		self.solve_btn.config(state=tk.NORMAL)
 		self.play_btn.config(state=tk.NORMAL)
+		self.cancel_btn.config(state=tk.DISABLED)
+		self.fade_in_solved_picture(duration_ms=800, steps=20)
 		self.update_status("Solution complete!")
 	
 	def update_status(self, message: str):

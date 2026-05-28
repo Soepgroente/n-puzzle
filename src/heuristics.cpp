@@ -6,64 +6,64 @@ const GoalInfo* info;
 
 int countConflictsInRow(const std::vector<ui32>& tiles, const GoalInfo& goalInfo, ui32 row, ui32 size)
 {
-    ui32 conflicts = 0;
-    
-    for (ui32 col1 = 0; col1 < size; col1++)
-    {
-        ui32 idx1 = row * size + col1;
-        ui32 tile1 = tiles[idx1];
-        
-        if (tile1 == 0) continue;
-        if (goalInfo.goalRow[tile1] != row) continue;
-        
-        ui32 goalCol1 = goalInfo.goalCol[tile1];
-        
-        for (ui32 col2 = col1 + 1; col2 < size; col2++)
-        {
-            ui32 idx2 = row * size + col2;
-            ui32 tile2 = tiles[idx2];
-            
-            if (tile2 == 0) continue;
-            if (goalInfo.goalRow[tile2] != row) continue;
-            
-            if (goalCol1 > goalInfo.goalCol[tile2])
-            {
-                conflicts++;
-            }
-        }
-    }    
-    return conflicts;
+	ui32 conflicts = 0;
+	
+	for (ui32 col1 = 0; col1 < size; col1++)
+	{
+		ui32 idx1 = row * size + col1;
+		ui32 tile1 = tiles[idx1];
+		
+		if (tile1 == 0) continue;
+		if (goalInfo.goalRow[tile1] != row) continue;
+		
+		ui32 goalCol1 = goalInfo.goalCol[tile1];
+		
+		for (ui32 col2 = col1 + 1; col2 < size; col2++)
+		{
+			ui32 idx2 = row * size + col2;
+			ui32 tile2 = tiles[idx2];
+			
+			if (tile2 == 0) continue;
+			if (goalInfo.goalRow[tile2] != row) continue;
+			
+			if (goalCol1 > goalInfo.goalCol[tile2])
+			{
+				conflicts++;
+			}
+		}
+	}    
+	return static_cast<int>(conflicts);
 }
 
 int countConflictsInColumn(const std::vector<ui32>& tiles, const GoalInfo& goalInfo, ui32 col, ui32 size)
 {
-    ui32 conflicts = 0;
-    
-    for (ui32 row1 = 0; row1 < size; row1++)
-    {
-        ui32 idx1 = row1 * size + col;
-        ui32 tile1 = tiles[idx1];
-        
-        if (tile1 == 0) continue;
-        if (goalInfo.goalCol[tile1] != col) continue;
-        
-        ui32 goalRow1 = goalInfo.goalRow[tile1];
-        
-        for (ui32 row2 = row1 + 1; row2 < size; row2++)
-        {
-            ui32 idx2 = row2 * size + col;
-            ui32 tile2 = tiles[idx2];
-            
-            if (tile2 == 0) continue;
-            if (goalInfo.goalCol[tile2] != col) continue;
-            
-            if (goalRow1 > goalInfo.goalRow[tile2])
-            {
-                conflicts++;
-            }
-        }
-    }    
-    return conflicts;
+	ui32 conflicts = 0;
+	
+	for (ui32 row1 = 0; row1 < size; row1++)
+	{
+		ui32 idx1 = row1 * size + col;
+		ui32 tile1 = tiles[idx1];
+		
+		if (tile1 == 0) continue;
+		if (goalInfo.goalCol[tile1] != col) continue;
+		
+		ui32 goalRow1 = goalInfo.goalRow[tile1];
+		
+		for (ui32 row2 = row1 + 1; row2 < size; row2++)
+		{
+			ui32 idx2 = row2 * size + col;
+			ui32 tile2 = tiles[idx2];
+			
+			if (tile2 == 0) continue;
+			if (goalInfo.goalCol[tile2] != col) continue;
+			
+			if (goalRow1 > goalInfo.goalRow[tile2])
+			{
+				conflicts++;
+			}
+		}
+	}    
+	return conflicts;
 }
 
 int	linearConflict(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
@@ -84,8 +84,8 @@ int	linearConflict(const std::vector<ui32>& tiles, const std::vector<ui32>& solu
 
 int	manhattanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
 {
-	ui32	distance = 0;
-	int size = static_cast<int>(tiles.size());
+	const int size = static_cast<int>(tiles.size());
+	int	distance = 0;
 
 	for (int index = 0; index < size; index++)
 	{
@@ -107,13 +107,15 @@ int	manhattanDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& s
 
 int	hammingDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& solutionIndexes, int n)
 {
-	ui32	distance = 0;
+	(void)n;
+	const int size = static_cast<ui32>(tiles.size());
+	int distance = 0;
 
-	for (int index = 0; index < n; index++)
+	for (int index = 1; index < size; index++)
 	{
-		int	tile = tiles[solutionIndexes[index]];
+		const ui32 goalIndex = solutionIndexes[index - 1];
 
-		if (tile != 0 && tile - 1 != index)
+		if (tiles[goalIndex] != static_cast<ui32>(index))
 		{
 			distance++;
 		}
@@ -124,9 +126,9 @@ int	hammingDistance(const std::vector<ui32>& tiles, const std::vector<ui32>& sol
 ui32	PuzzleData::calculateHeuristicValue(const Board& board)
 {
 	int result = 0;
-	int	n = PuzzleData::n;
+	const int n = PuzzleData::n;
 	int size = static_cast<int>(heuristics.size());
-	const std::vector<ui32>&	tiles = board.tiles;
+	const std::vector<ui32>& tiles = board.tiles;
 
 	info = &goalInfo;
 

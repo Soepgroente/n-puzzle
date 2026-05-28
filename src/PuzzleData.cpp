@@ -122,25 +122,89 @@ void	PuzzleData::setSolution()
 	solution = Board(sol);
 }
 
+static ui32	countInversions(const std::vector<ui32>& tiles, const std::vector<ui32>& order)
+{
+	std::vector<ui32> seq;
+	seq.reserve(tiles.size());
+
+	for (ui32 index : order)
+	{
+		ui32 v = tiles[index];
+		if (v != 0)
+		{
+			seq.push_back(v);
+		}
+	}
+
+	ui32 inversions = 0;
+	for (size_t i = 0; i < seq.size(); i++)
+	{
+		for (size_t j = i + 1; j < seq.size(); j++)
+		{
+			if (seq[i] > seq[j])
+			{
+				inversions++;
+			}
+		}
+	}
+	return inversions;
+}
+
+static ui32	blankRowFromBottom(ui32 blankIndex, ui32 n)
+{
+	ui32 rowFromTop = blankIndex / n;
+
+	return n - rowFromTop;
+}
+
+static bool	isSolvable(const Board& start, const Board& goal, const std::vector<ui32>& readingOrder)
+{
+	const ui32 n = static_cast<ui32>(PuzzleData::n);
+
+	ui32 startInv = countInversions(start.tiles, readingOrder);
+	ui32 goalInv  = countInversions(goal.tiles, readingOrder);
+
+	/*	even gridsize	*/
+	if ((n % 2) == 1)
+	{
+		return (startInv % 2) == (goalInv % 2);
+	}
+
+	/*	odd gridsize	*/
+	ui32 startBlank = blankRowFromBottom(start.emptyTile, n);
+	ui32 goalBlank  = blankRowFromBottom(goal.emptyTile, n);
+
+	return ((startInv + startBlank) % 2) == ((goalInv + goalBlank) % 2);
+}
+
 void	PuzzleData::init(const std::vector<ui32>& initialState)
 {
 	Board	initialBoard(initialState);
 
 	checkInitialConfiguration(initialBoard);
-	addState(initialBoard);
 	setSolution();
+	if (isSolvable(initialBoard, solution, solutionIndexes) == false)
+	{
+		throw std::invalid_argument("Puzzle is not solvable");
+	}
+	addState(initialBoard);
 
-	ui32 size = static_cast<ui32>(solutionIndexes.size());
+	const ui32 N = static_cast<ui32>(PuzzleData::n);
+	const ui32 size = static_cast<ui32>(solutionIndexes.size());
 
 	goalInfo.goalRow.resize(size);
 	goalInfo.goalCol.resize(size);
-	for (ui32 tile = 0; tile < size; tile++)
+	for (ui32 tile = 1; tile < size; tile++)
 	{
-		ui32 goalIdx = solutionIndexes[tile];
+		ui32 goalIdx = solutionIndexes[tile - 1];
 
-		goalInfo.goalRow[tile] = goalIdx / size;
-		goalInfo.goalCol[tile] = goalIdx % size;
+		goalInfo.goalRow[tile] = goalIdx / N;
+		goalInfo.goalCol[tile] = goalIdx % N;
 	}
+	const ui32 blankGoalIdx = solutionIndexes.back();
+
+	goalInfo.goalRow[0] = blankGoalIdx / N;
+	goalInfo.goalCol[0] = blankGoalIdx % N;
 }
 
 void	PuzzleData::parseHeuristics()
