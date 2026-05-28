@@ -122,18 +122,18 @@ void	PuzzleData::setSolution()
 	solution = Board(sol);
 }
 
-static ui32	countInversions(const std::vector<ui32>& tiles, const std::vector<ui32>& order)
+static ui32	countInversions(const std::vector<ui32>& tiles, const std::vector<ui32>& goalRank)
 {
 	std::vector<ui32> seq;
 	seq.reserve(tiles.size());
 
-	for (ui32 index : order)
+	for (ui32 v : tiles)
 	{
-		ui32 v = tiles[index];
-		if (v != 0)
+		if (v == 0)
 		{
-			seq.push_back(v);
+			continue;
 		}
+		seq.push_back(goalRank[v]);
 	}
 
 	ui32 inversions = 0;
@@ -157,12 +157,32 @@ static ui32	blankRowFromBottom(ui32 blankIndex, ui32 n)
 	return n - rowFromTop;
 }
 
-static bool	isSolvable(const Board& start, const Board& goal, const std::vector<ui32>& readingOrder)
+static std::vector<ui32>	buildGoalRank(const std::vector<ui32>& goalTiles)
+{
+	const ui32 boardSize = static_cast<ui32>(goalTiles.size());
+	std::vector<ui32> goalRank(boardSize, 0);
+
+	ui32 rank = 0;
+	for (ui32 i = 0; i < boardSize; ++i)
+	{
+		ui32 t = goalTiles[i];
+
+		if (t == 0)
+		{
+			continue;
+		}
+		goalRank[t] = rank++;
+	}
+	return goalRank;
+}
+
+static bool	isSolvable(const Board& start, const Board& goal)
 {
 	const ui32 n = static_cast<ui32>(PuzzleData::n);
 
-	ui32 startInv = countInversions(start.tiles, readingOrder);
-	ui32 goalInv  = countInversions(goal.tiles, readingOrder);
+	const std::vector<ui32> goalRank = buildGoalRank(goal.tiles);
+	ui32 startInv = countInversions(start.tiles, goalRank);
+	ui32 goalInv  = countInversions(goal.tiles, goalRank);
 
 	/*	even gridsize	*/
 	if ((n % 2) == 1)
@@ -183,7 +203,7 @@ void	PuzzleData::init(const std::vector<ui32>& initialState)
 
 	checkInitialConfiguration(initialBoard);
 	setSolution();
-	if (isSolvable(initialBoard, solution, solutionIndexes) == false)
+	if (isSolvable(initialBoard, solution) == false)
 	{
 		throw std::invalid_argument("Puzzle is not solvable");
 	}

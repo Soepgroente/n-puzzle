@@ -38,7 +38,7 @@ class NPuzzleGUI:
 		self.wood_dark = "#654321"
 
 		self.picture_mode = False
-		self.snake_image_path = "assets/spiralgalaxy.jpg"
+		self.snake_image_path = "assets/npuzzle.png"
 		self._base_image = None
 		self._tile_photoimages = {}
 		self._spiral_goal_map = None
@@ -57,6 +57,10 @@ class NPuzzleGUI:
 		self.last_height = self.root.winfo_height()
 		
 		self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+		# try:
+		# 	self.load_random_picture()
+		# except Exception as e:
+		# 	self.update_status(f"Picture load skipped: {e}")
 		
 	def setup_ui(self):
 		main_container = tk.Frame(self.root)
@@ -225,7 +229,7 @@ class NPuzzleGUI:
 		speed_slider = tk.Scale(
 			options_row,
 			from_=0.5,
-			to=10.0,
+			to=25.0,
 			resolution=0.5,
 			orient=tk.HORIZONTAL,
 			variable=self.speed_var,
@@ -339,6 +343,11 @@ class NPuzzleGUI:
 	def load_puzzle_from_file(self, filepath):
 		"""Load a puzzle from a file and display it."""
 		self.hide_final_overlay()
+		if self.picture_mode:
+			try:
+				self.load_random_picture()
+			except Exception as e:
+				self.update_status(f"Random picture load failed: {e}")
 		try:
 			with open(filepath, 'r') as f:
 				lines = f.readlines()
@@ -560,6 +569,11 @@ class NPuzzleGUI:
 	
 	def generate_puzzle(self):
 		self.hide_final_overlay()
+		if self.picture_mode:
+			try:
+				self.load_random_picture()
+			except Exception as e:
+				self.update_status(f"Random picture load failed: {e}")
 		self.n = self.n_var.get()
 		size = self.n * self.n
 		numbers = list(range(size))
@@ -1033,12 +1047,46 @@ class NPuzzleGUI:
 		self._spiral_goal_map = None
 		self._tile_photoimages.clear()
 
+		self.pick_random_picture_asset()
 		if self.picture_mode:
 			self.ensure_snake_tiles()
 
 		for i in range(self.n):
 			for j in range(self.n):
 				self.update_tile(i, j)
+
+	def pick_random_picture_asset(self):
+		assets_dir = "assets"
+		exts = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".avif"}
+
+		if not os.path.isdir(assets_dir):
+			raise FileNotFoundError(f"Assets directory not found: {assets_dir}")
+
+		files = [
+			os.path.join(assets_dir, f)
+			for f in os.listdir(assets_dir)
+			if os.path.splitext(f.lower())[1] in exts
+			and os.path.isfile(os.path.join(assets_dir, f))
+		]
+
+		if not files:
+			raise FileNotFoundError(f"No images found in {assets_dir} (extensions: {sorted(exts)})")
+
+		return random.choice(files)
+
+	def load_random_picture(self):
+		self.snake_image_path = self.pick_random_picture_asset()
+
+		# Clear image caches so ensure_snake_tiles() reloads and reslices
+		self._base_image = None
+		self._tile_photoimages.clear()
+
+		# If picture mode is on, regenerate slices immediately
+		if self.picture_mode:
+			self.ensure_snake_tiles()
+			self.refresh_picture_assets_and_tiles()
+
+		self.update_status(f"Picture: {os.path.basename(self.snake_image_path)}")
 
 	def on_animation_complete(self):
 		self.is_playing = False

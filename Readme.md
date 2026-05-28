@@ -1,0 +1,1 @@
+Puzzles 4x4: 1, 3, 5, 6, 8 are solvable from examples.
