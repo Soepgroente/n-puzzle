@@ -6,6 +6,7 @@ import json
 import threading
 import time
 from typing import List, Tuple
+from PIL import Image, ImageTk
 import os
 import signal
 
@@ -35,6 +36,12 @@ class NPuzzleGUI:
 		self.text_color = "white"
 		self.wood_color = "#8B4513"
 		self.wood_dark = "#654321"
+
+		self.picture_mode = False
+		self.snake_image_path = "assets/spiralgalaxy.jpg"
+		self._base_image = None
+		self._tile_photoimages = {}
+		self._spiral_goal_map = None
 		
 		self.setup_ui()
 		self.initialize_grid()
@@ -193,6 +200,20 @@ class NPuzzleGUI:
 		self.greedy_btn.bind("<Enter>", self.on_greedy_hover_enter)
 		self.greedy_btn.bind("<Leave>", self.on_greedy_hover_leave)
 
+		self.picture_btn = tk.Button(
+			options_row,
+			text="Picture Mode",
+			command=self.on_picture_toggled,
+			bg="#555",
+			fg="#aaa",
+			padx=15,
+			pady=5,
+			font=("Arial", 10, "bold"),
+			cursor="hand2",
+			relief=tk.RAISED
+		)
+		self.picture_btn.pack(side=tk.LEFT, padx=5)
+
 		tk.Label(options_row, text="Animation Speed:").pack(side=tk.LEFT, padx=(15, 5))
 		
 		self.speed_var = tk.DoubleVar(value=2.0)
@@ -340,6 +361,7 @@ class NPuzzleGUI:
 			
 			self.n = n
 			self.n_var.set(n)
+			self._spiral_goal_map = None
 			self.grid = grid_rows
 			self.initial_grid = [row[:] for row in grid_rows]
 			
@@ -484,28 +506,33 @@ class NPuzzleGUI:
 			
 			self.tile_labels.append(row_labels)
 			self.tile_frames.append(row_frames)
+		self.refresh_picture_assets_and_tiles()
 	
 	def update_tile(self, row, col):
 		value = self.grid[row][col]
 		lbl = self.tile_labels[row][col]
-		
+
 		if value == 0:
-			lbl.config(
-				text="",
-				bg=self.empty_color,
-				relief=tk.SUNKEN
-			)
+			lbl.config(text="", image="", bg=self.empty_color, relief=tk.SUNKEN)
+			return
+
+		if self.picture_mode:
+			if value not in self._tile_photoimages:
+				self.ensure_snake_tiles()
+
+			img = self._tile_photoimages.get(value)
+			if img is None:
+				# fallback
+				lbl.config(text=str(value), image="", bg=self.tile_color, fg=self.text_color, relief=tk.RAISED)
+			else:
+				lbl.config(text="", image=img, bg=self.wood_color, relief=tk.RAISED)
 		else:
-			lbl.config(
-				text=str(value),
-				bg=self.tile_color,
-				fg=self.text_color,
-				relief=tk.RAISED
-			)
+			lbl.config(text=str(value), image="", bg=self.tile_color, fg=self.text_color, relief=tk.RAISED)
 	
 	def on_n_changed(self, event):
 		self.solution_steps = []
 		self.play_btn.config(state=tk.DISABLED)
+		self._spiral_goal_map = None
 		self.initialize_grid()
 		self.update_status("Grid size changed.  Click Generate to create a puzzle.")
 	
@@ -528,10 +555,7 @@ class NPuzzleGUI:
 		self.solution_steps = []
 		self.play_btn.config(state=tk.DISABLED)
 		
-		for i in range(self.n):
-			for j in range(self.n):
-				self.update_tile(i, j)
-		
+		self.refresh_picture_assets_and_tiles()		
 		self.update_status(f"Generated random {self.n}x{self.n} puzzle")
 	
 	def get_grid_as_list(self) -> List[int]:
@@ -729,6 +753,120 @@ class NPuzzleGUI:
 			
 			self.update_status(f"Playing solution...Step {step_num}/{len(self.solution_steps)}")
 	
+	def build_spiral_goal_map(self):
+		n = self.n
+		goal = [[None] * n for _ in range(n)]
+
+		# Spiral fill coordinates
+		top, left = 0, 0
+		bottom, right = n - 1, n - 1
+		val = 1
+		last = n * n
+
+		while top <= bottom and left <= right:
+			# left->right along top
+			for c in range(left, right + 1):
+				goal[top][c] = val
+				val += 1
+			top += 1
+
+			# top->bottom along right
+			for r in range(top, bottom + 1):
+				goal[r][right] = val
+				val += 1
+			right -= 1
+
+			if top <= bottom:
+				# right->left along bottom
+				for c in range(right, left - 1, -1):
+					goal[bottom][c] = val
+					val += 1
+				bottom -= 1
+
+			if left <= right:
+				# bottom->top along left
+				for r in range(bottom, top - 1, -1):
+					goal[r][left] = val
+					val += 1
+				left += 1
+
+		# Replace the last value (N^2) with 0 (blank)
+		for r in range(n):
+			for c in range(n):
+				if goal[r][c] == last:
+					goal[r][c] = 0
+					break
+
+		return goal
+
+	def correct_tile_number_for_position(self, r, c):
+		if self._spiral_goal_map is None or len(self._spiral_goal_map) != self.n:
+			self._spiral_goal_map = self.build_spiral_goal_map()
+		return self._spiral_goal_map[r][c]
+
+	def on_picture_toggled(self):
+		self.picture_mode = not self.picture_mode
+
+		if self.picture_mode:
+			self.picture_btn.config(bg="#90ee90", fg="#333", activebackground="#7ad87a")
+			self.ensure_snake_tiles()
+		else:
+			self.picture_btn.config(bg="#555", fg="#aaa", activebackground="#666")
+
+		# Refresh display
+		for i in range(self.n):
+			for j in range(self.n):
+				self.update_tile(i, j)
+
+	def ensure_snake_tiles(self):
+		"""Load + resize + slice the snake image into N*N PhotoImages keyed by tile number."""
+		if self.current_tile_size <= 0:
+			return
+
+		try:
+			if self._base_image is None:
+				self._base_image = Image.open(self.snake_image_path).convert("RGB")
+		except Exception as e:
+			messagebox.showerror("Image Error", f"Failed to load snake image:\n{e}")
+			self.picture_mode = False
+			self.picture_btn.config(bg="#555", fg="#aaa", activebackground="#666")
+			return
+
+		tile = self.current_tile_size
+		board_px = tile * self.n
+
+		# Resize to exact board size (simple; no aspect preservation)
+		board_img = self._base_image.resize((board_px, board_px), Image.Resampling.LANCZOS)
+
+		self._tile_photoimages.clear()
+
+		# For each board cell, crop slice, then assign it to the tile number that belongs there in the spiral goal.
+		for r in range(self.n):
+			for c in range(self.n):
+				correct_num = self.correct_tile_number_for_position(r, c)
+				if correct_num == 0:
+					continue  # blank has no image
+
+				left = c * tile
+				upper = r * tile
+				right = left + tile
+				lower = upper + tile
+
+				crop = board_img.crop((left, upper, right, lower))
+				self._tile_photoimages[correct_num] = ImageTk.PhotoImage(crop)
+
+	def refresh_picture_assets_and_tiles(self):
+		"""Rebuild cached spiral mapping + image slices (if enabled) and refresh all tiles."""
+		self._spiral_goal_map = None
+		self._tile_photoimages.clear()
+
+		if self.picture_mode:
+			self.ensure_snake_tiles()
+
+		for i in range(self.n):
+			for j in range(self.n):
+				self.update_tile(i, j)
+
 	def on_animation_complete(self):
 		self.is_playing = False
 		self.generate_btn.config(state=tk.NORMAL)

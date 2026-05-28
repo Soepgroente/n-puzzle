@@ -9,6 +9,12 @@
 
 typedef uint32_t ui32;
 
+struct GoalInfo
+{
+	std::vector<ui32> goalRow;
+	std::vector<ui32> goalCol;
+};
+
 class PuzzleData
 {
 	using HeuristicFunction = int (*)(const std::vector<ui32>&, const std::vector<ui32>&, int);
@@ -42,8 +48,11 @@ class PuzzleData
 	std::unordered_map<Board, Board>	cameFrom;
 
 	Board				solution;
+	GoalInfo			goalInfo;
 	std::vector<ui32>	solutionIndexes;
 	std::vector<ui32>	path;
+
+	size_t	time = 0;
 
 	size_t	largestOpenBoardSize = 0;
 	size_t	peakMemoryUsage = 0;

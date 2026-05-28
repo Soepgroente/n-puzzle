@@ -63,7 +63,7 @@ void	PuzzleData::loopPathBackwards()
 	while (cameFrom.find(currentBoard) != cameFrom.end())
 	{
 		Board	parentBoard = cameFrom[currentBoard];
-		ui32	move = 0;
+		Direction	move = NONE;
 
 		if (currentBoard.emptyTile == parentBoard.emptyTile - static_cast<int>(n))
 		{
@@ -96,11 +96,12 @@ void	PuzzleData::solve() noexcept
 	startTime = std::chrono::high_resolution_clock::now();
 	while (openBoards.empty() == false)
 	{
+		time++;
 		peakMemoryUsage = std::max(peakMemoryUsage, closedBoards.size() * memoryFootPrint + openBoards.size() * memoryFootPrint);
 		if (peakMemoryUsage >= availableRamSize)
 		{
 			endTime = std::chrono::high_resolution_clock::now();
-			std::cout << "Memory limit reached, aborting search." << std::endl;
+			std::cout << "Memory limit reached, aborting search at " << openBoards.size() + closedBoards.size() << " boards." << std::endl;
 			break;
 		}
 		Board currentBoard = openBoards.top();
@@ -146,7 +147,7 @@ void	PuzzleData::solve() noexcept
 			}
 			cameFrom[newBoard] = currentBoard;
 			openBoards.push(newBoard);
-			largestOpenBoardSize = std::max(largestOpenBoardSize, openBoards.size());
+			largestOpenBoardSize = std::max(largestOpenBoardSize, openBoards.size() + closedBoards.size());
 		}
 		closedBoards.insert(currentBoard);
 	}
@@ -182,7 +183,7 @@ void	PuzzleData::printSolution(std::ostream& os)	noexcept
 	}
 	os << "],\n";
 	os << "\"time_ms\": " << std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() << ",\n";
-	os << "\"total_searched\": " << boardStates << ",\n";
+	os << "\"total_searched\": " << time << ",\n";
 	os << "\"peak_memory_states\": " << boardStates << ",\n";
 	os << "\"peak_memory_bytes\": " << boardStates * sizeof(Board) << "\n}" << std::endl;
 }

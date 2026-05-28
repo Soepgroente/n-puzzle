@@ -19,8 +19,9 @@ PuzzleData::PuzzleData()
 {
 	#ifdef __linux__
 		struct sysinfo info;
+
 		sysinfo(&info);
-		availableRamSize = info.totalram / (sizeof(Board) + sizeof(void*) * 2);
+		availableRamSize = info.totalram / sizeof(Board);
 	#elif __APPLE__
 		int mib[2] = {CTL_HW, HW_MEMSIZE};
 		size_t memsize;
@@ -128,6 +129,18 @@ void	PuzzleData::init(const std::vector<ui32>& initialState)
 	checkInitialConfiguration(initialBoard);
 	addState(initialBoard);
 	setSolution();
+
+	ui32 size = static_cast<ui32>(solutionIndexes.size());
+
+	goalInfo.goalRow.resize(size);
+	goalInfo.goalCol.resize(size);
+	for (ui32 tile = 0; tile < size; tile++)
+	{
+		ui32 goalIdx = solutionIndexes[tile];
+
+		goalInfo.goalRow[tile] = goalIdx / size;
+		goalInfo.goalCol[tile] = goalIdx % size;
+	}
 }
 
 void	PuzzleData::parseHeuristics()
