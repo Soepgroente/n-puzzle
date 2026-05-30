@@ -227,17 +227,9 @@ void	PuzzleData::init(const std::vector<ui32>& initialState)
 	goalInfo.goalCol[0] = blankGoalIdx % N;
 }
 
-void	PuzzleData::parseHeuristics()
+void	PuzzleData::parseHeuristics(const std::string& input)
 {
-	std::string	input;
-	std::getline(std::cin, input);
-
-	if (input == "Greedy search enabled")
-	{
-		greedySearch = true;
-		std::getline(std::cin, input);
-	}
-	if (input.empty() == true || input == "none" || input == "Dijkstra (no heuristic)")
+	if (input.empty() == true || input == "none" || input == "Dijkstra" || input == "Dijkstra (no heuristic)")
 	{
 		return ;
 	}
@@ -264,10 +256,27 @@ void	PuzzleData::parseHeuristics()
 	}
 }
 
-void	PuzzleData::configFromFile(const char* filename)
+void	PuzzleData::configFromFile(const char* input)
 {
-	parseHeuristics();
-	std::ifstream file(std::string("puzzles/") + filename);
+	std::stringstream ss(input);
+	std::string filename;
+	std::string heuristicsInput;
+
+	if ((ss >> filename).fail() == true)
+	{
+		throw std::invalid_argument("Invalid input format: " + std::string(input));
+	}
+	std::getline(ss, heuristicsInput);
+	if (heuristicsInput.empty() == false)
+	{
+		heuristicsInput.erase(0, heuristicsInput.find_first_not_of(" \t"));
+	}
+	parseHeuristics(heuristicsInput);
+	if (filename.substr(0, 8) != "puzzles/")
+	{
+		filename = "puzzles/" + filename;
+	}
+	std::ifstream file(filename);
 
 	if (file.is_open() == false)
 	{
@@ -307,12 +316,22 @@ void	PuzzleData::configFromFile(const char* filename)
 			}
 		}
 	}
+	std::cout << "Attempting to solve\n" << startingConfiguration << std::endl;
 	init(startingConfiguration);
 }
 
 void	PuzzleData::configFromGUI()
 {
-	parseHeuristics();
+	std::string input;
+	
+	std::getline(std::cin, input);
+	if (input == "Greedy search enabled")
+	{
+		greedySearch = true;
+		std::getline(std::cin, input);
+	}
+	parseHeuristics(input);
+
 	std::string	line;
 	std::vector<ui32>	startingConfiguration;
 	ui32	value;

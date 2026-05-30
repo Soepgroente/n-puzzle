@@ -21,7 +21,8 @@ int main(int argc, char** argv)
 		{
 			std::cerr << argv[i] << " ";
 		}
-		std::cerr << "\nUse the GUI or use: " << argv[0] << " [puzzle_file]" << std::endl;
+		std::cerr << "\nUse the GUI or use: " << argv[0] << " [puzzle_file, (optional)heuristic, (optional)greedy search]" << std::endl;
+		std::cerr << "Available heuristics:\nManhattan distance\nLinear conflict\nHamming distance\nManhattan + LC\nDijkstra (default)" << std::endl;
 		return 1;
 	}
 	try

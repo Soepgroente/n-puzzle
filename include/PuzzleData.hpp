@@ -59,7 +59,7 @@ class PuzzleData
 	size_t	availableRamSize;
 
 	ui32	calculateHeuristicValue(const Board& board);
-	void	parseHeuristics();
+	void	parseHeuristics(const std::string& input);
 	void	loopPathBackwards();
 
 	bool	greedySearch = false;
