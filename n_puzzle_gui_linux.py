@@ -225,7 +225,7 @@ class NPuzzleGUI:
 
 		tk.Label(options_row, text="Animation Speed:").pack(side=tk.LEFT, padx=(15, 5))
 		
-		self.speed_var = tk.DoubleVar(value=2.0)
+		self.speed_var = tk.DoubleVar(value=5.0)
 		speed_slider = tk.Scale(
 			options_row,
 			from_=0.5,
