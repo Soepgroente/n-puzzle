@@ -83,7 +83,7 @@ class NPuzzleGUI(QMainWindow):
 		# animation
 		self.is_playing = False
 		self.moves_per_second = 5.0
-		self.animation_speed_ms = 500
+		self.animation_speed_ms = 200
 		self.current_move_index = 0
 		self.animation_timer = QTimer()
 		self.animation_timer.timeout.connect(self._animation_tick)
@@ -241,7 +241,7 @@ class NPuzzleGUI(QMainWindow):
 		self.speed_slider.valueChanged.connect(self._on_speed_changed)
 		row3.addWidget(self.speed_slider, 1)
 
-		self.speed_value = QLabel("2.0 moves/sec")
+		self.speed_value = QLabel("5.0 moves/sec")
 		self.speed_value.setStyleSheet("font-size: 10pt; color: white; background: transparent; min-width: 110px;")
 		row3.addWidget(self.speed_value)
 
@@ -432,7 +432,26 @@ class NPuzzleGUI(QMainWindow):
 	def _generate_puzzle(self):
 		self._hide_final_overlay()
 		if self.picture_mode:
-			self._try_load_random_picture()
+        # Try switching picture; if it fails, keep existing picture tiles
+			old_path = self.snake_image_path
+			old_base = self._base_image
+			old_tiles = dict(self._tile_qpixmaps)
+			old_goal = self._spiral_goal_map
+
+			try:
+				self.snake_image_path = self._pick_random_picture_asset()
+				self._base_image = None
+				self._spiral_goal_map = None
+				self._ensure_picture_tiles()  # <-- force build now
+				self._update_status(f"Picture: {Path(self.snake_image_path).name}")
+			except Exception as e:
+				# restore previous picture
+				self.snake_image_path = old_path
+				self._base_image = old_base
+				self._tile_qpixmaps = old_tiles
+				self._spiral_goal_map = old_goal
+				QMessageBox.warning(self, "Image Error", f"Could not load new picture:\n{e}")
+
 
 		size = self.n * self.n
 		tiles = list(range(size))

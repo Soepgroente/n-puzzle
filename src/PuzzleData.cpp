@@ -27,7 +27,7 @@ PuzzleData::PuzzleData()
 		size_t memsize;
 		size_t len = sizeof(memsize);
 		sysctl(mib, 2, &memsize, &len, NULL, 0);
-		availableRamSize = memsize / (sizeof(Board) + sizeof(void*) * 2);
+		availableRamSize = memsize / sizeof(size_t);
 	#else
 		availableRamSize = 8 * 1024 * 1024 * 1024 / (sizeof(Board) + sizeof(void*) * 2); // Default to 8GB RAM
 	#endif
