@@ -207,7 +207,7 @@ void	PuzzleData::init(const std::vector<ui32>& initialState)
 	{
 		throw std::invalid_argument("Puzzle is not solvable");
 	}
-	addState(initialBoard);
+	openBoards.push(initialBoard);
 
 	const ui32 N = static_cast<ui32>(PuzzleData::n);
 	const ui32 size = static_cast<ui32>(solutionIndexes.size());
@@ -227,8 +227,16 @@ void	PuzzleData::init(const std::vector<ui32>& initialState)
 	goalInfo.goalCol[0] = blankGoalIdx % N;
 }
 
-void	PuzzleData::parseHeuristics(const std::string& input)
+void	PuzzleData::parseHeuristics(std::string input)
 {
+	const size_t greedy = input.find("greedy");
+
+	input.erase(0, input.find_first_not_of(" \t"));
+	if (greedy != std::string::npos)
+	{
+		this->greedySearch = true;
+		input.erase(input.begin() + greedy - 1, input.end());
+	}
 	if (input.empty() == true || input == "none" || input == "Dijkstra" || input == "Dijkstra (no heuristic)")
 	{
 		return ;
@@ -316,7 +324,6 @@ void	PuzzleData::configFromFile(const char* input)
 			}
 		}
 	}
-	std::cout << "Attempting to solve\n" << startingConfiguration << std::endl;
 	init(startingConfiguration);
 }
 
@@ -325,11 +332,6 @@ void	PuzzleData::configFromGUI()
 	std::string input;
 	
 	std::getline(std::cin, input);
-	if (input == "Greedy search enabled")
-	{
-		greedySearch = true;
-		std::getline(std::cin, input);
-	}
 	parseHeuristics(input);
 
 	std::string	line;
@@ -346,9 +348,4 @@ void	PuzzleData::configFromGUI()
 		}
 	}
 	init(startingConfiguration);
-}
-
-void	PuzzleData::addState(const Board& board)
-{
-	openBoards.push(board);
 }

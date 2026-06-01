@@ -31,7 +31,6 @@ class PuzzleData
 	void	configFromGUI();
 	void	init(const std::vector<ui32>& initialState);
 
-	void	addState(const Board& board);
 	int		findSensibleMoves(Board& board) noexcept;
 	void	setSolution();
 	void	printSolution(std::ostream& os)	noexcept;
@@ -59,7 +58,7 @@ class PuzzleData
 	size_t	availableRamSize;
 
 	ui32	calculateHeuristicValue(const Board& board);
-	void	parseHeuristics(const std::string& input);
+	void	parseHeuristics(std::string input);
 	void	loopPathBackwards();
 
 	bool	greedySearch = false;

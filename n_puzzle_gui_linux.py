@@ -225,7 +225,7 @@ class NPuzzleGUI:
 
 		tk.Label(options_row, text="Animation Speed:").pack(side=tk.LEFT, padx=(15, 5))
 		
-		self.speed_var = tk.DoubleVar(value=5.0)
+		self.speed_var = tk.DoubleVar(value=2.0)
 		speed_slider = tk.Scale(
 			options_row,
 			from_=0.5,
@@ -569,6 +569,12 @@ class NPuzzleGUI:
 	
 	def generate_puzzle(self):
 		self.hide_final_overlay()
+
+		# If a file was selected before, switch back to random mode
+		if self.selected_puzzle_file is not None:
+			self.selected_puzzle_file = None
+			self.puzzle_file_var.set("(Random)")
+
 		if self.picture_mode:
 			try:
 				self.load_random_picture()
@@ -632,38 +638,40 @@ class NPuzzleGUI:
 
 		self.solve_btn.config(state=tk.NORMAL)
 		self.cancel_btn.config(state=tk.DISABLED)
-	
+
 	def run_solver(self):
 		"""Run the solver executable in a separate thread"""
 		try:
-			# Build input string
-			input_lines = []
-			
-			if self.greedy_search_enabled:
-				input_lines.append("Greedy search enabled")
-			
-			input_lines.append(self.selected_heuristic)
-			
-			# Add grid data
-			grid_data = self.get_grid_as_list()
-			input_lines.append(' '.join(map(str, grid_data)))
-			
-			input_data = '\n'.join(input_lines)
-			
-			# Build command
+			heuristic = self.selected_heuristic.strip()
+			greedy_token = "greedy" if self.greedy_search_enabled else ""
+
+			heuristics_line = f"{heuristic} {greedy_token}".strip()
+
 			cmd = ["./n-puzzle"]
+
 			if self.selected_puzzle_file:
-				cmd.append(self.selected_puzzle_file)
+				# FILE MODE: solver expects ONE argv string: "<filename> <heuristic> [greedy]"
+				arg = f"{self.selected_puzzle_file} {heuristics_line}".strip()
+				cmd.append(arg)
+				input_data = None
+			else:
+				# GUI MODE: first line = heuristics_line, then grid numbers, then EOF
+				grid_data = self.get_grid_as_list()
+				grid_line = " ".join(map(str, grid_data))
+				input_data = heuristics_line + "\n" + grid_line + "\n"
+
+			print("CMD:", cmd)
+			if input_data is not None:
+				print("STDIN:\n" + input_data)
 
 			self.solver_process = subprocess.Popen(
 				cmd,
 				stdin=subprocess.PIPE,
 				stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE,
-				text=True,
-				bufsize=1
+				text=True
 			)
-			
+
 			stdout, stderr = self.solver_process.communicate(input=input_data, timeout=300)
 			
 			if self.solver_process.returncode == 0:
